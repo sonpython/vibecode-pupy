@@ -38,7 +38,8 @@ function renderSource(source, data) {
   const status = byId(`${source}-status`);
   status.textContent = data.status;
   status.className = `badge ${data.status}`;
-  byId(`${source}-meta`).textContent = `snapshot ${ageText(data.stale_sec)}`;
+  byId(`${source}-meta`).textContent =
+    `snapshot ${ageText(data.stale_sec)} · 4-5h reset ${data.current_resets_at_gmt7 || "--:--"} GMT+7`;
   setBar(source, "current", data.current_pct);
   setBar(source, "weekly", data.weekly_pct);
 }

@@ -86,6 +86,37 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 14:31 SGT — reset-time-and-manual-refresh-firmware
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to fix unplugged battery display, replace the loading icon, detect the top button for manual fetch, and add GMT+7 reset time for the 4-5h quota window.
+
+### ✅ Done
+- Added `current_resets_at_gmt7` to `usage-api` status output and verified public API returns local reset times such as Claude `19:00` and Codex `19:24`.
+- Updated web UI metadata to show only the 4-5h/current window reset time in GMT+7.
+- Updated ESP32 firmware to parse and display current reset time as `RHH:MM` per source row.
+- Fixed invalid battery ADC readings so disconnected/invalid battery no longer renders as `BAT 0%`; it now renders `BAT --` or `CHG --`.
+- Replaced the persistent LVGL spinner with a fetch status label using LVGL symbols: refresh while fetching, check on success, close on error.
+- Added manual-refresh edge detection across GPIO5, GPIO0, GPIO47, and GPIO48 to discover the real top button without driving unknown pins.
+- Rebuilt and flashed firmware; monitor verified button-watch logs, Wi-Fi connect, HTTP 200, expanded JSON payload, and `battery_pct=-1` for invalid raw battery input.
+
+### 📁 Files changed
+- `.gitignore` — UPDATED, ignore local `.tmp/` remote-control runtime files.
+- `usage-api/app.py` — UPDATED, compute GMT+7 current reset display string.
+- `usage-api/schemas.py` — UPDATED, expose `current_resets_at_gmt7`.
+- `usage-api/static/app.js` — UPDATED, show 4-5h reset time in the web dashboard.
+- `usage-api/tests/test_app.py` — UPDATED, assert reset display field.
+- `firmware/usage-monitor/main/main.c` — UPDATED, reset-time UI, battery invalid handling, fetch icon state, and multi-GPIO manual refresh detection.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+### 🔑 Key decisions
+- Let the API compute GMT+7 reset time because the ESP32 firmware does not maintain reliable wall-clock time.
+- Monitor multiple likely button GPIOs for a stable edge first; serial logs identify the real button before narrowing the firmware to one pin later.
+
+### 🚨 Follow-ups
+- [ ] Ask the user to press the physical top button while monitor is open in a later session, then keep only the GPIO that logs `manual refresh button=...`.
+
 ## 2026-05-17 14:16 SGT — battery-charge-and-claude-collector
 
 **Actor**: codex-cli

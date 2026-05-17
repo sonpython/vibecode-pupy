@@ -51,8 +51,12 @@
 #define BATTERY_ADC_CHANNEL ADC_CHANNEL_6
 #define USB_ADC_CHANNEL ADC_CHANNEL_0
 #define BATTERY_ADC_SAMPLES 8
+#define BATTERY_VALID_MIN_RAW 1200
 #define USB_PRESENT_MIN_RAW 1500
 #define USB_PRESENT_MAX_RAW 4000
+#define BUTTON_POLL_MS 100
+#define BUTTON_REFRESH_COOLDOWN_MS 800
+#define STATUS_REFRESH_WAIT_MS (60 * 1000)
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
@@ -78,12 +82,14 @@ static source_widgets_t s_claude_ui;
 static source_widgets_t s_codex_ui;
 static lv_obj_t *s_header_status;
 static lv_obj_t *s_power_status;
+static lv_obj_t *s_fetch_status;
 
 typedef struct {
     int current_pct;
     int weekly_pct;
     int stale_sec;
     char status[20];
+    char current_reset_gmt7[8];
 } source_status_t;
 
 typedef struct {
@@ -108,6 +114,20 @@ typedef struct {
     int len;
     int cap;
 } http_buffer_t;
+
+typedef struct {
+    gpio_num_t pin;
+    const char *name;
+    int last_level;
+    TickType_t last_trigger_tick;
+} button_watch_t;
+
+static button_watch_t s_buttons[] = {
+    {GPIO_NUM_5, "side-gpio5", -1, 0},
+    {GPIO_NUM_0, "top-boot-gpio0", -1, 0},
+    {GPIO_NUM_47, "power-gpio47", -1, 0},
+    {GPIO_NUM_48, "power-gpio48", -1, 0},
+};
 
 static lv_color_t pct_color(int pct)
 {
@@ -211,6 +231,9 @@ static void update_source_row(source_widgets_t *widgets, const source_status_t *
     lv_bar_set_value(widgets->weekly_bar, weekly, LV_ANIM_ON);
 
     lv_label_set_text(widgets->status, strcmp(source->status, "ok") == 0 ? "OK" : source->status);
+    if (strcmp(source->status, "ok") == 0 && source->current_reset_gmt7[0] != 0) {
+        set_label(widgets->status, "R%s", source->current_reset_gmt7);
+    }
     lv_obj_set_style_text_color(widgets->status, strcmp(source->status, "ok") == 0 ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
 }
 
@@ -267,8 +290,10 @@ static power_status_t read_power_status(void)
         }
         if (samples > 0) {
             power.battery_raw = total / samples;
-            power.battery_pct = battery_pct_from_adc(power.battery_raw);
-            power.has_battery = true;
+            if (power.battery_raw >= BATTERY_VALID_MIN_RAW) {
+                power.battery_pct = battery_pct_from_adc(power.battery_raw);
+                power.has_battery = true;
+            }
         }
     }
 
@@ -300,8 +325,11 @@ static void update_power_status(const power_status_t *power)
         return;
     }
     if (!power->has_battery) {
-        lv_label_set_text(s_power_status, "BAT --");
-        lv_obj_set_style_text_color(s_power_status, lv_color_hex(0x909aaa), 0);
+        lv_label_set_text(s_power_status, power->charging ? "CHG --" : "BAT --");
+        lv_obj_set_style_text_color(
+            s_power_status,
+            power->charging ? lv_color_hex(0x55d2ff) : lv_color_hex(0x909aaa),
+            0);
         return;
     }
     set_label(s_power_status, "%s %d%%", power->charging ? "CHG" : "BAT", power->battery_pct);
@@ -309,6 +337,45 @@ static void update_power_status(const power_status_t *power)
         s_power_status,
         power->charging ? lv_color_hex(0x55d2ff) : pct_color(100 - power->battery_pct),
         0);
+}
+
+static void ui_show_message(const char *line1, const char *line2);
+
+static void update_fetch_status(bool fetching, bool ok)
+{
+    if (!s_fetch_status) {
+        return;
+    }
+    if (fetching) {
+        lv_label_set_text(s_fetch_status, LV_SYMBOL_REFRESH);
+        lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0x55d2ff), 0);
+        return;
+    }
+    if (ok) {
+        lv_label_set_text(s_fetch_status, LV_SYMBOL_OK);
+        lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0x50dc96), 0);
+        return;
+    }
+    lv_label_set_text(s_fetch_status, LV_SYMBOL_CLOSE);
+    lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0xeb505a), 0);
+}
+
+static void ui_set_fetching(bool fetching)
+{
+    if (!lvgl_port_lock(0)) {
+        return;
+    }
+    if (!s_fetch_status || !s_header_status) {
+        lvgl_port_unlock();
+        if (fetching) {
+            ui_show_message("FETCHING", "vibecode api");
+        }
+        return;
+    }
+    lv_label_set_text(s_header_status, fetching ? "FETCH" : "LIVE");
+    lv_obj_set_style_text_color(s_header_status, fetching ? lv_color_hex(0x55d2ff) : lv_color_hex(0x50dc96), 0);
+    update_fetch_status(fetching, true);
+    lvgl_port_unlock();
 }
 
 static void ui_build_status_screen(void)
@@ -344,13 +411,12 @@ static void ui_build_status_screen(void)
     lv_obj_set_style_text_align(s_power_status, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_pos(s_power_status, 134, 216);
 
-    lv_obj_t *spinner = lv_spinner_create(screen);
-    lv_obj_set_size(spinner, 22, 22);
-    lv_obj_set_pos(spinner, 232, 208);
-    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x263040), LV_PART_MAIN);
-    lv_obj_set_style_arc_width(spinner, 3, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x55d2ff), LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(spinner, 3, LV_PART_INDICATOR);
+    s_fetch_status = lv_label_create(screen);
+    lv_label_set_text(s_fetch_status, LV_SYMBOL_REFRESH);
+    style_label(s_fetch_status, lv_color_hex(0x788291), &lv_font_montserrat_20);
+    lv_obj_set_width(s_fetch_status, 28);
+    lv_obj_set_style_text_align(s_fetch_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(s_fetch_status, 232, 210);
 }
 
 static void ui_show_message(const char *line1, const char *line2)
@@ -388,6 +454,7 @@ static void ui_update_status(const usage_status_t *status)
     update_source_row(&s_claude_ui, &status->claude);
     update_source_row(&s_codex_ui, &status->codex);
     update_power_status(&status->power);
+    update_fetch_status(false, status->ok);
     lvgl_port_unlock();
 }
 
@@ -570,10 +637,12 @@ static bool parse_source(cJSON *root, const char *name, source_status_t *out)
     cJSON *weekly = cJSON_GetObjectItem(src, "weekly_pct");
     cJSON *stale = cJSON_GetObjectItem(src, "stale_sec");
     cJSON *status = cJSON_GetObjectItem(src, "status");
+    cJSON *reset_gmt7 = cJSON_GetObjectItem(src, "current_resets_at_gmt7");
     out->current_pct = cJSON_IsNumber(current) ? current->valueint : -1;
     out->weekly_pct = cJSON_IsNumber(weekly) ? weekly->valueint : -1;
     out->stale_sec = cJSON_IsNumber(stale) ? stale->valueint : -1;
     strlcpy(out->status, cJSON_IsString(status) ? status->valuestring : "error", sizeof(out->status));
+    strlcpy(out->current_reset_gmt7, cJSON_IsString(reset_gmt7) ? reset_gmt7->valuestring : "--:--", sizeof(out->current_reset_gmt7));
     return strcmp(out->status, "ok") == 0;
 }
 
@@ -631,12 +700,45 @@ static bool fetch_usage(usage_status_t *status)
 
 static void configure_button(void)
 {
-    gpio_config_t cfg = {
-        .pin_bit_mask = 1ULL << PIN_BUTTON,
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&cfg));
+    (void)PIN_BUTTON;
+    for (size_t i = 0; i < sizeof(s_buttons) / sizeof(s_buttons[0]); i++) {
+        gpio_num_t pin = s_buttons[i].pin;
+        gpio_config_t cfg = {
+            .pin_bit_mask = 1ULL << pin,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = (pin == GPIO_NUM_0 || pin == GPIO_NUM_5) ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        };
+        ESP_ERROR_CHECK(gpio_config(&cfg));
+        s_buttons[i].last_level = gpio_get_level(pin);
+        ESP_LOGI(TAG, "button watch %s gpio=%d initial=%d", s_buttons[i].name, pin, s_buttons[i].last_level);
+    }
+}
+
+static bool button_fetch_requested(void)
+{
+    TickType_t now = xTaskGetTickCount();
+    TickType_t cooldown = pdMS_TO_TICKS(BUTTON_REFRESH_COOLDOWN_MS);
+
+    for (size_t i = 0; i < sizeof(s_buttons) / sizeof(s_buttons[0]); i++) {
+        int level = gpio_get_level(s_buttons[i].pin);
+        if (level == s_buttons[i].last_level) {
+            continue;
+        }
+        vTaskDelay(pdMS_TO_TICKS(30));
+        level = gpio_get_level(s_buttons[i].pin);
+        if (level == s_buttons[i].last_level) {
+            continue;
+        }
+        s_buttons[i].last_level = level;
+        if (now - s_buttons[i].last_trigger_tick < cooldown) {
+            continue;
+        }
+        s_buttons[i].last_trigger_tick = now;
+        ESP_LOGI(TAG, "manual refresh button=%s gpio=%d level=%d", s_buttons[i].name, s_buttons[i].pin, level);
+        return true;
+    }
+    return false;
 }
 
 static void init_power_monitor(void)
@@ -686,7 +788,7 @@ void app_main(void)
 
     usage_status_t status;
     while (true) {
-        ui_show_message("FETCHING", "vibecode api");
+        ui_set_fetching(true);
         bool got = fetch_usage(&status);
         if (!got) {
             status.ok = false;
@@ -694,12 +796,11 @@ void app_main(void)
         status.power = read_power_status();
         ui_update_status(&status);
 
-        for (int i = 0; i < 240; i++) {
-            if (gpio_get_level(PIN_BUTTON) == 0) {
-                vTaskDelay(pdMS_TO_TICKS(250));
+        for (int elapsed_ms = 0; elapsed_ms < STATUS_REFRESH_WAIT_MS; elapsed_ms += BUTTON_POLL_MS) {
+            if (button_fetch_requested()) {
                 break;
             }
-            vTaskDelay(pdMS_TO_TICKS(250));
+            vTaskDelay(pdMS_TO_TICKS(BUTTON_POLL_MS));
         }
     }
 }

@@ -4,7 +4,7 @@ import json
 import os
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
@@ -19,6 +19,7 @@ APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
 STALE_AFTER_SEC = int(os.environ.get("STALE_AFTER_SEC", "600"))
 SOURCES: tuple[Source, Source] = ("claude", "codex")
+GMT7 = timezone(timedelta(hours=7))
 
 app = FastAPI(title="Usage Monitor API", version="0.1.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -75,10 +76,20 @@ def seconds_until(iso_ts: str) -> int:
     return max(0, int((reset_at - now).total_seconds()))
 
 
+def gmt7_time(iso_ts: str) -> str:
+    if not iso_ts:
+        return "--:--"
+    reset_at = datetime.fromisoformat(iso_ts)
+    if reset_at.tzinfo is None:
+        reset_at = reset_at.replace(tzinfo=timezone.utc)
+    return reset_at.astimezone(GMT7).strftime("%H:%M")
+
+
 def missing_status() -> SourceStatus:
     return SourceStatus(
         current_pct=-1,
         current_resets_in_sec=0,
+        current_resets_at_gmt7="--:--",
         weekly_pct=-1,
         weekly_resets_in_sec=0,
         status="missing",
@@ -130,6 +141,7 @@ def build_status() -> StatusOut:
         result[source] = SourceStatus(
             current_pct=payload["current_pct"],
             current_resets_in_sec=seconds_until(payload["current_resets_at"]),
+            current_resets_at_gmt7=gmt7_time(payload["current_resets_at"]),
             weekly_pct=payload["weekly_pct"],
             weekly_resets_in_sec=seconds_until(payload["weekly_resets_at"]),
             status=source_status,

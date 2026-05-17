@@ -32,6 +32,7 @@ class CollectIn(BaseModel):
 class SourceStatus(BaseModel):
     current_pct: int
     current_resets_in_sec: int
+    current_resets_at_gmt7: str
     weekly_pct: int
     weekly_resets_in_sec: int
     status: DisplayStatus

@@ -47,8 +47,10 @@ def test_collect_and_status(monkeypatch, tmp_path):
     assert res.status_code == 200
     body = res.json()
     assert body["claude"]["current_pct"] == 50
+    assert body["claude"]["current_resets_at_gmt7"] != "--:--"
     assert body["claude"]["status"] == "ok"
     assert body["codex"]["status"] == "missing"
+    assert body["codex"]["current_resets_at_gmt7"] == "--:--"
 
 
 def test_auth_failures(monkeypatch, tmp_path):
