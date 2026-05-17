@@ -27,6 +27,7 @@
 #include "nvs_flash.h"
 
 #include "brand_icons.h"
+#include "fetch_animation.h"
 #include "secrets.h"
 
 #define LCD_HOST SPI3_HOST
@@ -505,6 +506,32 @@ static void ui_set_fetching(bool fetching)
     }
     update_fetch_status(fetching, true);
     lvgl_port_unlock();
+}
+
+static void ui_play_fetch_animation(void)
+{
+    lv_obj_t *image = NULL;
+
+    for (int i = 0; i < FETCH_ANIMATION_FRAME_COUNT; i++) {
+        if (!lvgl_port_lock(0)) {
+            vTaskDelay(pdMS_TO_TICKS(FETCH_ANIMATION_FRAME_MS));
+            continue;
+        }
+
+        if (!image) {
+            lv_obj_t *screen = lv_screen_active();
+            lv_obj_clean(screen);
+            lv_obj_set_style_bg_color(screen, lv_color_hex(0x000000), 0);
+            lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+            image = lv_image_create(screen);
+            lv_obj_center(image);
+        }
+
+        lv_image_set_src(image, fetch_animation_frames[i]);
+        lv_obj_invalidate(image);
+        lvgl_port_unlock();
+        vTaskDelay(pdMS_TO_TICKS(FETCH_ANIMATION_FRAME_MS));
+    }
 }
 
 static void ui_build_status_screen(void)
@@ -1002,7 +1029,7 @@ static bool handle_button_action(button_action_t action)
             set_display_enabled(true);
         }
         if (!s_wifi_ap_mode) {
-            ui_set_fetching(true);
+            ui_play_fetch_animation();
             ESP_LOGI(TAG, "manual fetch requested");
             return true;
         }

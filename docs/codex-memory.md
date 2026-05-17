@@ -86,6 +86,30 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 18:38 SGT — firmware-manual-fetch-bonk-animation
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User approved the generated bonk animation and asked for it to be cropped around the robot so it displays large on the real screen.
+
+**What changed**
+- Generated a 10-frame RGB565 LVGL animation asset from the approved tight crop.
+- Added the animation to the firmware build as `fetch_animation.c/.h`.
+- Changed the top manual-fetch button path so it plays the centered 220x220 bonk animation before the existing fetch request flow.
+- Kept periodic background refresh behavior unchanged; only the top manual-fetch action plays the animation.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully; app binary still has ~45% free in the factory partition.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, Wi-Fi connection, HTTP 200, valid battery reading, and no crash after loading the larger firmware image.
+
+**Files changed**
+- `firmware/usage-monitor/main/fetch_animation.c` — NEW, 10-frame RGB565 LVGL animation asset.
+- `firmware/usage-monitor/main/fetch_animation.h` — NEW, animation frame table declarations.
+- `firmware/usage-monitor/main/CMakeLists.txt` — UPDATED, compile animation asset.
+- `firmware/usage-monitor/main/main.c` — UPDATED, play animation on top-button manual fetch.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 17:27 SGT — readme-live-device-photo
 
 **Actor**: codex-cli

@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "brand_icons.c"
+    SRCS "main.c" "brand_icons.c" "fetch_animation.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
