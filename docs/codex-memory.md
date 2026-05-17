@@ -86,6 +86,47 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 12:45 SGT — esp32-usage-monitor-firmware-live
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User provided WiFi credentials for ESP32
+
+### ✅ Done
+- Saved WiFi credentials into ignored local `firmware/secrets/wifi.env`.
+- Created minimal ESP-IDF firmware at `firmware/usage-monitor` for the confirmed `sp-esp32-s3-1.54-muma` board.
+- Firmware initializes ST7789 display pins, backlight, WiFi STA, HTTPS client with ESP x509 certificate bundle, and direct JSON parsing for `https://vibecode.sonpython.com/status`.
+- `prepare_secrets.sh` generates ignored `main/secrets.h` from local WiFi env + `usage-api/.env` device secret.
+- Built firmware with ESP-IDF v5.5 and custom 4MB factory partition.
+- Flashed firmware to `/dev/cu.usbmodem83101`.
+- Serial verification:
+  - WiFi connected to `mp`.
+  - Device got IP `192.168.1.35`.
+  - Cloudflare certificate validated.
+  - `GET /status` returned HTTP 200 with 301-byte payload.
+  - Device stayed running after fetch; no reboot after stack-size fix.
+
+### 📁 Files changed
+- `firmware/usage-monitor/*` — NEW, minimal ESP-IDF firmware
+- `.gitignore` — UPDATED, ignore local firmware secrets/build/sdkconfig outputs
+- `docs/codex-memory.md` — UPDATED, prepended this entry
+- `firmware/secrets/wifi.env` — LOCAL IGNORED, WiFi credentials
+- `firmware/usage-monitor/main/secrets.h` — LOCAL IGNORED, generated WiFi/API secret header
+
+### 🔑 Key decisions
+- Use a clean ESP-IDF firmware rather than stripping the full Xiaozhi app in-place. This avoids audio/cloud dependencies and got a working HTTPS usage display faster.
+- Use hardcoded local secrets for this MVP; provisioning AP can come later if needed.
+- Increase `CONFIG_ESP_MAIN_TASK_STACK_SIZE` to 12288 because ESP HTTP client overflowed the default main stack during TLS setup.
+
+### 📊 State changes (active projects)
+- Firmware Phase 05/06: planned -> MVP flashed and live.
+
+### 🚨 Follow-ups
+- [ ] Confirm visually that the rendered bars/text orientation looks right on the physical display.
+- [ ] Add deep sleep + GPIO0 wake now that fetch/display loop works.
+- [ ] Add battery ADC display if desired.
+- [ ] Consider moving HTTPS/fetch work to its own task and adding backoff/offline UI polish.
+
 ## 2026-05-17 12:32 SGT — public-domain-and-production-token-rotation
 
 **Actor**: codex-cli

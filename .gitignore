@@ -46,6 +46,11 @@ pnpm-lock.yaml
 .env*
 !.env.example
 secrets/
+firmware/secrets/
+firmware/usage-monitor/main/secrets.h
+firmware/usage-monitor/build/
+firmware/usage-monitor/sdkconfig
+firmware/usage-monitor/sdkconfig.old
 usage-api/data/
 usage-api/cloudflared/*.json
 usage-api/cloudflared/*.pem
