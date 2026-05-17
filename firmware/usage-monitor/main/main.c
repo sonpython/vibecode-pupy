@@ -56,6 +56,7 @@
 #define BUTTON_REFRESH_COOLDOWN_MS 800
 #define BUTTON_LONG_PRESS_MS 5000
 #define STATUS_REFRESH_WAIT_MS (60 * 1000)
+#define UNCHANGED_REFRESH_LIMIT 5
 #define WIFI_RESET_AP_SSID "VIBECODE-PUPY-SETUP"
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -114,6 +115,10 @@ typedef struct {
     bool ok;
     char message[64];
 } usage_status_t;
+
+static usage_status_t s_last_usage_status;
+static bool s_has_last_usage_status = false;
+static int s_unchanged_refresh_count = 0;
 
 typedef struct {
     char *buf;
@@ -405,6 +410,7 @@ static void update_power_status(const power_status_t *power)
 }
 
 static void ui_show_message(const char *line1, const char *line2);
+static void set_display_enabled(bool enabled);
 
 static void update_fetch_status(bool fetching, bool ok)
 {
@@ -547,6 +553,45 @@ static void ui_update_status(const usage_status_t *status)
         set_label(s_next_fetch_status, "NEXT %02d:%02d", (STATUS_REFRESH_WAIT_MS / 1000) / 60, (STATUS_REFRESH_WAIT_MS / 1000) % 60);
     }
     lvgl_port_unlock();
+}
+
+static bool source_usage_equal(const source_status_t *a, const source_status_t *b)
+{
+    return a->current_pct == b->current_pct
+        && a->weekly_pct == b->weekly_pct
+        && strcmp(a->status, b->status) == 0
+        && strcmp(a->current_reset_gmt7, b->current_reset_gmt7) == 0;
+}
+
+static bool usage_equal_ignoring_power(const usage_status_t *a, const usage_status_t *b)
+{
+    return a->ok == b->ok
+        && source_usage_equal(&a->claude, &b->claude)
+        && source_usage_equal(&a->codex, &b->codex);
+}
+
+static void update_unchanged_refresh_state(const usage_status_t *status, bool fetched)
+{
+    if (!fetched) {
+        s_unchanged_refresh_count = 0;
+        s_has_last_usage_status = false;
+        return;
+    }
+
+    if (s_has_last_usage_status && usage_equal_ignoring_power(status, &s_last_usage_status)) {
+        s_unchanged_refresh_count++;
+    } else {
+        s_unchanged_refresh_count = 0;
+        s_last_usage_status = *status;
+        s_has_last_usage_status = true;
+    }
+
+    ESP_LOGI(TAG, "unchanged refresh count=%d/%d", s_unchanged_refresh_count, UNCHANGED_REFRESH_LIMIT);
+    if (s_unchanged_refresh_count >= UNCHANGED_REFRESH_LIMIT) {
+        ESP_LOGI(TAG, "auto display off after unchanged refreshes");
+        s_unchanged_refresh_count = 0;
+        set_display_enabled(false);
+    }
 }
 
 static void set_backlight(int level)
@@ -987,6 +1032,10 @@ void app_main(void)
         }
         status.power = read_power_status();
         ui_update_status(&status);
+        update_unchanged_refresh_state(&status, got);
+        if (!s_display_enabled) {
+            continue;
+        }
 
         for (int elapsed_ms = 0; elapsed_ms < STATUS_REFRESH_WAIT_MS; elapsed_ms += BUTTON_POLL_MS) {
             if (elapsed_ms % 1000 == 0) {

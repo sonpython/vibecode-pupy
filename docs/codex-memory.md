@@ -86,6 +86,28 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:58 SGT — firmware-auto-off-after-unchanged-refreshes
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to auto turn off after 5 refreshes where the usage values do not change.
+
+**What changed**
+- Added unchanged-usage tracking in firmware.
+- After each successful refresh, firmware compares Claude/Codex current percent, weekly percent, source status, and reset clock label against the previous successful snapshot.
+- Battery/power state and reset countdown seconds are ignored so charging noise and minute-by-minute countdown changes do not prevent auto-off.
+- After 5 consecutive unchanged refreshes, the display/backlight turns off and the firmware enters the existing idle button loop.
+- Top fetch button still wakes the display and performs a manual fetch.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, Wi-Fi connection, HTTP 200, valid battery readings, `unchanged refresh count=0/5` on the first fetch, then `unchanged refresh count=1/5` on the next unchanged refresh.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, unchanged-refresh counter and auto display-off behavior.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 16:27 SGT — firmware-manual-fetch-inline-status
 
 **Actor**: codex-cli
