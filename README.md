@@ -8,6 +8,7 @@ ESP32-S3 desk gadget that shows Claude Code and Codex usage on a small Xiaozhi-s
   <a href="docs/assets/demo/robot-usage-screen.webp"><img src="docs/assets/demo/thumb-usage.webp" width="140" alt="Robot usage screen"></a>
   <a href="docs/assets/demo/robot-firmware-boot.webp"><img src="docs/assets/demo/thumb-boot.webp" width="140" alt="Robot firmware loading"></a>
   <a href="docs/assets/demo/robot-hardware-front.webp"><img src="docs/assets/demo/thumb-hardware.webp" width="140" alt="Robot hardware front"></a>
+  <a href="docs/assets/demo/robot-device-live.webp"><img src="docs/assets/demo/thumb-device-live.webp" width="140" alt="Robot device running firmware"></a>
 </p>
 
 ## Architecture

@@ -86,6 +86,27 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 17:27 SGT — readme-live-device-photo
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User provided an additional real-device photo and asked to update docs and push.
+
+**What changed**
+- Converted the provided HEIC photo to a metadata-stripped WebP asset for GitHub-friendly display.
+- Generated a small square WebP thumbnail.
+- Added the new thumbnail/link to the README media strip at the top of the page.
+
+**Validation**
+- Confirmed generated image assets are small enough for the repo: main WebP ~91 KB, thumbnail ~13 KB.
+- Staged additions were scanned for known secret/PII patterns before commit.
+
+**Files changed**
+- `README.md` — UPDATED, added live device photo thumbnail/link.
+- `docs/assets/demo/robot-device-live.webp` — NEW, compressed live device photo.
+- `docs/assets/demo/thumb-device-live.webp` — NEW, compressed thumbnail.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 17:23 SGT — firmware-reset-progress-subbar
 
 **Actor**: codex-cli
