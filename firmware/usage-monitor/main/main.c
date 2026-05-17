@@ -57,6 +57,9 @@
 #define BUTTON_LONG_PRESS_MS 5000
 #define STATUS_REFRESH_WAIT_MS (60 * 1000)
 #define UNCHANGED_REFRESH_LIMIT 5
+#define CURRENT_RESET_WINDOW_SEC (5 * 60 * 60)
+#define RESET_BAR_WIDTH 142
+#define RESET_BAR_HEIGHT 2
 #define WIFI_RESET_AP_SSID "VIBECODE-PUPY-SETUP"
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -80,6 +83,7 @@ typedef struct {
     lv_obj_t *weekly_pct;
     lv_obj_t *status;
     lv_obj_t *current_bar;
+    lv_obj_t *reset_bar;
     lv_obj_t *weekly_bar;
     lv_obj_t *reset_text;
 } source_widgets_t;
@@ -173,13 +177,22 @@ static void set_label(lv_obj_t *obj, const char *fmt, ...)
 static void style_bar(lv_obj_t *bar, lv_color_t color)
 {
     lv_obj_remove_style_all(bar);
-    lv_obj_set_size(bar, 146, 14);
-    lv_obj_set_style_radius(bar, 7, LV_PART_MAIN);
+    lv_obj_set_size(bar, 146, 16);
+    lv_obj_set_style_radius(bar, 8, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, lv_color_hex(0x232935), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar, 7, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bar, 8, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
+}
+
+static void style_reset_bar(lv_obj_t *bar)
+{
+    lv_obj_remove_style_all(bar);
+    lv_obj_set_size(bar, 0, RESET_BAR_HEIGHT);
+    lv_obj_set_style_radius(bar, 2, 0);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(0xf0b42d), 0);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
 }
 
 static void style_week_arc(lv_obj_t *arc, lv_color_t color)
@@ -221,6 +234,17 @@ static void format_duration(int seconds, char *out, size_t out_size)
     }
 }
 
+static int reset_progress_pct(int seconds_left)
+{
+    if (seconds_left <= 0) {
+        return 100;
+    }
+    if (seconds_left >= CURRENT_RESET_WINDOW_SEC) {
+        return 0;
+    }
+    return 100 - ((seconds_left * 100) / CURRENT_RESET_WINDOW_SEC);
+}
+
 static void create_source_row(
     lv_obj_t *screen,
     int y,
@@ -246,6 +270,10 @@ static void create_source_row(
     widgets->current_bar = lv_bar_create(screen);
     style_bar(widgets->current_bar, lv_color_hex(0x55d2ff));
     lv_obj_set_pos(widgets->current_bar, 56, y + 28);
+
+    widgets->reset_bar = lv_obj_create(widgets->current_bar);
+    style_reset_bar(widgets->reset_bar);
+    lv_obj_set_pos(widgets->reset_bar, 2, 13);
 
     widgets->reset_text = lv_label_create(screen);
     lv_label_set_text(widgets->reset_text, "RESET --");
@@ -275,6 +303,7 @@ static void update_source_row(source_widgets_t *widgets, const source_status_t *
 {
     int current = MAX(0, MIN(source->current_pct, 100));
     int weekly = MAX(0, MIN(source->weekly_pct, 100));
+    int reset_progress = reset_progress_pct(source->current_resets_in_sec);
     lv_color_t current_color = strcmp(source->status, "ok") == 0 ? pct_color(source->current_pct) : lv_color_hex(0xeb505a);
     lv_color_t weekly_color = pct_color(source->weekly_pct);
     char reset_duration[16];
@@ -283,6 +312,13 @@ static void update_source_row(source_widgets_t *widgets, const source_status_t *
     lv_obj_set_style_text_color(widgets->current_pct, current_color, 0);
     lv_obj_set_style_bg_color(widgets->current_bar, current_color, LV_PART_INDICATOR);
     lv_bar_set_value(widgets->current_bar, current, LV_ANIM_ON);
+
+    if (strcmp(source->status, "ok") == 0) {
+        lv_obj_set_width(widgets->reset_bar, (RESET_BAR_WIDTH * reset_progress) / 100);
+        lv_obj_clear_flag(widgets->reset_bar, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(widgets->reset_bar, LV_OBJ_FLAG_HIDDEN);
+    }
 
     set_label(widgets->weekly_pct, source->weekly_pct >= 0 ? "%d%%" : "--", source->weekly_pct);
     lv_obj_set_style_arc_color(widgets->weekly_bar, weekly_color, LV_PART_INDICATOR);

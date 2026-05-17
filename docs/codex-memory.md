@@ -86,6 +86,28 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 17:23 SGT — firmware-reset-progress-subbar
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked for a thin secondary bar inside the main usage bar showing progress toward the reset time, filled in the same direction as usage, then asked to make that reset strip smaller and the main usage bar slightly larger.
+
+**What changed**
+- Added a thin reset-progress strip as a child inside each current usage bar.
+- The strip uses a contrasting amber color and fills left-to-right as the reset time approaches.
+- Increased the main usage bar height from 14 px to 16 px.
+- Reduced the embedded reset strip height from 3 px to 2 px and pinned it near the bottom of the usage bar.
+- Kept the reset text below the bar unchanged.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, Wi-Fi connection, HTTP 200, valid battery reading, and no LVGL crash after rendering the updated embedded reset bars.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, embedded reset progress strip in current usage bars and adjusted bar sizing.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 16:58 SGT — firmware-auto-off-after-unchanged-refreshes
 
 **Actor**: codex-cli
