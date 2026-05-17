@@ -86,6 +86,42 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 13:32 SGT — wonderboy-display-gpio-map-from-factory
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported the robot screen was still black after earlier firmware flashes; factory firmware was confirmed to display correctly.
+
+### ✅ Done
+- Restored the saved factory image temporarily and monitored boot logs; factory app identified as `xiaozhi` 2.0.8 / `WonderBoy-AI-Buddy`.
+- Used USB-JTAG/OpenOCD while factory firmware was running to read ESP32-S3 GPIO matrix registers and derive the real display pin map.
+- Updated usage-monitor firmware to use factory-derived pins:
+  - ST7789 SPI3 SCLK `GPIO9`, MOSI `GPIO10`, CS `GPIO14`
+  - LCD DC `GPIO8`, reset `GPIO18`
+  - Backlight `GPIO13`
+- Rebuilt and flashed the usage monitor firmware back onto the device.
+- Verified serial boot: display init completes, WiFi connects to LAN, and usage API returns HTTP 200.
+- Re-read GPIO registers under the monitor firmware to confirm display pins are configured on the expected GPIOs.
+
+### 📁 Files changed
+- `firmware/usage-monitor/main/main.c` — UPDATED, replaced guessed display/backlight pins with factory-derived WonderBoy map.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+### 🔑 Key decisions
+- Trust factory runtime GPIO matrix over upstream board guesses. Earlier candidates (`GPIO0/1/2/46`, `GPIO16`, `GPIO3`) allowed firmware/network to run but did not match the actual screen wiring.
+- Keep digital backlight enable on `GPIO13` for now. Factory uses LEDC PWM on `GPIO13`; a static high level is enough for full-bright monitor mode.
+
+### 📊 State changes (active projects)
+- ESP32 monitor firmware: black screen with guessed pins → flashed with factory-derived WonderBoy display map.
+- Factory backup: still preserved at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`.
+
+### 🚨 Follow-ups
+- [ ] Visual confirmation still needs the human looking at the physical screen. If it is lit but wrong/blank, first swap LCD `DC`/`RST` between `GPIO8` and `GPIO18`; all other display pins are now evidence-based.
+- [ ] After confirmed visually, commit and push the firmware pin-map change.
+
+### ⚠ Blockers / open questions
+- Codex cannot directly see the physical LCD, so visual success must be confirmed by user.
+
 ## 2026-05-17 13:03 SGT — usage-api-web-live-deploy
 
 **Actor**: codex-cli

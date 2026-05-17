@@ -24,15 +24,20 @@
 #include "secrets.h"
 
 #define LCD_HOST SPI3_HOST
-#define LCD_WIDTH 240
+#define LCD_WIDTH 280
 #define LCD_HEIGHT 240
-#define PIN_LCD_SCLK GPIO_NUM_12
+#define LCD_OFFSET_X 20
+#define LCD_OFFSET_Y 0
+#define PIN_LCD_SCLK GPIO_NUM_9
 #define PIN_LCD_MOSI GPIO_NUM_10
-#define PIN_LCD_CS GPIO_NUM_13
-#define PIN_LCD_DC GPIO_NUM_14
-#define PIN_LCD_RST GPIO_NUM_11
-#define PIN_BACKLIGHT GPIO_NUM_16
-#define PIN_BUTTON GPIO_NUM_0
+#define PIN_LCD_CS GPIO_NUM_14
+#define PIN_LCD_DC GPIO_NUM_8
+#define PIN_LCD_RST GPIO_NUM_18
+#define PIN_BACKLIGHT GPIO_NUM_13
+#define HAS_BACKLIGHT 1
+#define PIN_POWER_EN GPIO_NUM_NC
+#define HAS_POWER_EN 0
+#define PIN_BUTTON GPIO_NUM_5
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
@@ -215,14 +220,42 @@ static void draw_message(const char *line1, const char *line2)
     draw_text(20, 112, line2, rgb565(145, 154, 170), 1);
 }
 
+static void set_backlight(int level)
+{
+#if HAS_BACKLIGHT
+    gpio_set_level(PIN_BACKLIGHT, level);
+#else
+    (void)level;
+#endif
+}
+
+#if HAS_POWER_EN
+static void set_display_power(int level)
+{
+    gpio_set_level(PIN_POWER_EN, level);
+}
+#endif
+
 static void init_display(void)
 {
+#if HAS_POWER_EN
+    gpio_config_t pwr_cfg = {
+        .pin_bit_mask = 1ULL << PIN_POWER_EN,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    ESP_ERROR_CHECK(gpio_config(&pwr_cfg));
+    set_display_power(1);
+    vTaskDelay(pdMS_TO_TICKS(30));
+#endif
+
+#if HAS_BACKLIGHT
     gpio_config_t bk_cfg = {
         .pin_bit_mask = 1ULL << PIN_BACKLIGHT,
         .mode = GPIO_MODE_OUTPUT,
     };
     ESP_ERROR_CHECK(gpio_config(&bk_cfg));
-    gpio_set_level(PIN_BACKLIGHT, 1);
+    set_backlight(0);
+#endif
 
     spi_bus_config_t buscfg = {
         .sclk_io_num = PIN_LCD_SCLK,
@@ -237,7 +270,7 @@ static void init_display(void)
     esp_lcd_panel_io_spi_config_t io_config = {
         .dc_gpio_num = PIN_LCD_DC,
         .cs_gpio_num = PIN_LCD_CS,
-        .pclk_hz = 40 * 1000 * 1000,
+        .pclk_hz = 60 * 1000 * 1000,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
         .spi_mode = 0,
@@ -254,17 +287,13 @@ static void init_display(void)
     ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, true, false));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, false));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, false, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(s_panel, LCD_OFFSET_X, LCD_OFFSET_Y));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
-    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(220, 40, 60));
-    vTaskDelay(pdMS_TO_TICKS(350));
-    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(35, 190, 120));
-    vTaskDelay(pdMS_TO_TICKS(350));
-    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(35, 110, 230));
-    vTaskDelay(pdMS_TO_TICKS(350));
     draw_message("BOOTING", "display ok");
-    ESP_LOGI(TAG, "display initialized and diagnostic colors drawn");
+    set_backlight(1);
+    ESP_LOGI(TAG, "display initialized");
 }
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
