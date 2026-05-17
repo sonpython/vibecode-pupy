@@ -26,7 +26,7 @@ Dockerized Python service that calls `GET https://chatgpt.com/backend-api/wham/u
 - On HTTP 401 (auth expired): POST `status: auth_expired` snapshot + fire webhook alert
 
 ### Non-functional
-- Run as Docker container alongside usage-api on 192.168.1.120
+- Run as Docker container alongside usage-api on <docker-host-ip>
 - Auth credentials in mounted secret file (not in image)
 - Webhook target configurable (Discord webhook URL or Pushover)
 - Poll cadence env-tunable (default 300s)
@@ -154,7 +154,7 @@ docker container ─► every N sec ─► httpx.get(/wham/usage, JWT+cookies+he
    - Step 2: F12 → Network → reload analytics page → find `/wham/usage` request
    - Step 3: Right-click → "Copy as cURL"
    - Step 4: Use provided `parse_curl.py` helper (~30 LoC) to extract `authorization` + cookies + headers into `codex_auth.json` format
-   - Step 5: `scp` to 192.168.1.120:/path/to/secrets/codex_auth.json; restart container
+   - Step 5: `scp` to <docker-host-ip>:/path/to/secrets/codex_auth.json; restart container
 
 6. **Validation**:
    - First call returns 200 with `used_percent` matching the dashboard

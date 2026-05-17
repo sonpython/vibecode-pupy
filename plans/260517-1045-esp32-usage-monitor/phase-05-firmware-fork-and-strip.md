@@ -71,7 +71,7 @@ Fork xiaozhi-esp32 v2.0.8 into our own working tree, remove audio/AI/cloud subsy
    idf.py set-target esp32s3
    idf.py menuconfig   # select board from Phase 01
    idf.py build
-   idf.py -p /dev/cu.usbmodem83101 flash monitor
+   idf.py -p <esp32-serial-port> flash monitor
    ```
    Expect: boots into full Xiaozhi UI.
 

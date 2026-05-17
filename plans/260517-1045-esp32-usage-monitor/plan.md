@@ -15,7 +15,7 @@ Convert existing Xiaozhi alarm-clock (ESP32-S3 N16R8, 16MB flash + 8MB PSRAM, na
 ## Architecture (3 layers)
 
 ```
-[Mac]                  [Docker @ 192.168.1.120]              [ESP32-S3 Xiaozhi]
+[Mac]                  [Docker @ <docker-host-ip>]              [ESP32-S3 Xiaozhi]
 claude-collector       usage-api (FastAPI+SQLite)    HTTPS    forked xiaozhi-esp32
 codex-collector  ──>   cloudflared tunnel            <──      LVGL UI + deep sleep
                        /collect/{src}  /status

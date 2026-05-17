@@ -1,7 +1,7 @@
 # Brainstorm Report — ESP32 Xiaozhi → Claude/Codex Usage Monitor
 
 **Date:** 2026-05-17 10:45 GMT+7
-**Owner:** michaelphan
+**Owner:** project owner
 **Status:** Design agreed, ready for `/ck:plan`
 
 ---
@@ -90,7 +90,7 @@ User initially thought Anthropic/OpenAI expose usage APIs for subscription plans
 - Auth: bearer token in keychain
 - Failure mode: log only, no retry storm
 
-### 5.2 Codex Collector (Docker on 192.168.1.120)
+### 5.2 Codex Collector (Docker on <docker-host-ip>)
 - Lang: Python + `httpx` (~40 LoC, no browser needed)
 - **Endpoint discovered**: `GET https://chatgpt.com/backend-api/wham/usage`
 - Returns JSON with exact shape we need:
@@ -125,7 +125,7 @@ User initially thought Anthropic/OpenAI expose usage APIs for subscription plans
   - JWT expiry mid-day → handled by webhook + manual refresh
   - OpenAI deprecates `/wham/usage` endpoint → unlikely (UI depends on it), but track via daily smoke test
 
-### 5.3 Usage API (Docker on 192.168.1.120)
+### 5.3 Usage API (Docker on <docker-host-ip>)
 - Lang: FastAPI + SQLite (~150 LoC)
 - Endpoints:
   - `POST /collect/{source}` — bearer auth (per-source token), body = snapshot JSON
@@ -194,7 +194,7 @@ User initially thought Anthropic/OpenAI expose usage APIs for subscription plans
 | Phase | Scope | Effort |
 |---|---|---|
 | **0. Hardware identify** | Match board to xiaozhi-esp32 `main/boards/*` (open device, read silkscreen, OR pinout probe). Set up ESP-IDF v5.5 toolchain. Build & flash stock xiaozhi to confirm pipeline works | 0.5d |
-| **1. Usage-API skeleton** | FastAPI Docker on 192.168.1.120, SQLite, `/collect/{source}` + `/status`, dummy data | 0.5d |
+| **1. Usage-API skeleton** | FastAPI Docker on <docker-host-ip>, SQLite, `/collect/{source}` + `/status`, dummy data | 0.5d |
 | **2. Claude collector** | Python + launchd on Mac, ccusage parsing, push to API | 0.5d |
 | **3. Codex collector** | Python httpx → `/wham/usage`, cookie/JWT extract + storage + 401 webhook | 0.5-1d |
 | **4. Firmware fork + strip** | Fork xiaozhi-esp32, identify minimum board+component subset, strip audio/AI/cloud, verify still boots | 1d |
@@ -236,14 +236,14 @@ User initially thought Anthropic/OpenAI expose usage APIs for subscription plans
 
 1. 🟡 **Xiaozhi hardware** — partially resolved via live USB probe:
    - ✅ Chip: ESP32-S3 N16R8 (16MB flash, 8MB PSRAM, native USB-JTAG, dual core + LP core, 240MHz)
-   - ✅ MAC: a0:f2:62:e8:a4:40, Boya 16MB flash
+   - ✅ MAC: <device-mac>, Boya 16MB flash
    - ✅ Currently running: official `xiaozhi-esp32` v2.0.8 (github.com/78/xiaozhi-esp32, ESP-IDF v5.5)
    - ✅ Partition layout: standard Xiaozhi (dual 4MB OTA + 8MB assets)
    - ⏳ Still TBD: exact board variant name (match against xiaozhi-esp32 `main/boards/*`) — needs PCB silkscreen check or pinout probe in Phase 0
    - ⏳ Still TBD: actual display resolution + controller (NOT 1024×768 per Alibaba spec — marketing fiction)
    - ⏳ Still TBD: deep-sleep current measurement (need µA meter or USB power meter)
 2. ✅ **Codex Cloud selectors** — DOM scrape path verified via user-supplied DevTools screenshots. See §5.2 for selectors. Tailwind class names may shift; pin known-good and add fallback by label text
-3. ✅ **Network** — HTTPS via Cloudflare Tunnel (`cloudflared`) → `https://usage.<userdomain>.com`. Docker host `192.168.1.120`
+3. ✅ **Network** — HTTPS via Cloudflare Tunnel (`cloudflared`) → `https://usage.<userdomain>.com`. Docker host `<docker-host-ip>`
 4. ✅ **OTA** — Not needed, USB-C re-flash acceptable for personal device. Saves ~1d work + binary size
 
 ## 9.1 New things learned mid-brainstorm

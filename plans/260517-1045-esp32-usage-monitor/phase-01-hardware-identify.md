@@ -15,7 +15,7 @@ Pin down the exact xiaozhi-esp32 board variant matching our physical device, cap
 ## Context Links
 - Brainstorm §9 hardware open items: `plans/reports/brainstorm-260517-1045-esp32-usage-monitor.md`
 - Upstream: github.com/78/xiaozhi-esp32 (path: `main/boards/`)
-- Known hardware (USB probe verified): ESP32-S3 N16R8, 16MB flash, 8MB PSRAM, MAC `a0:f2:62:e8:a4:40`, currently running xiaozhi v2.0.8 / ESP-IDF v5.5
+- Known hardware (USB probe verified): ESP32-S3 N16R8, 16MB flash, 8MB PSRAM, MAC `<device-mac>`, currently running xiaozhi v2.0.8 / ESP-IDF v5.5
 
 ## Requirements
 ### Functional
@@ -42,14 +42,14 @@ Likely candidates (Xiaozhi alarm-clock form factor + ESP32-S3 N16R8):
 
 ## Related Code Files
 - Create: `~/esp/esp-idf/` (ESP-IDF v5.5 install)
-- Create: `~/projects/xiaozhi-esp32-fork/` (git clone)
+- Create: `<workspace-root>/xiaozhi-esp32-fork/` (git clone)
 - Create: `plans/260517-1045-esp32-usage-monitor/reports/phase-01-board-identification.md` (findings)
 
 ## Implementation Steps
 
 1. **Backup current flash** (safety net for revert):
    ```bash
-   esptool --port /dev/cu.usbmodem83101 --baud 921600 read-flash 0x0 0x1000000 /tmp/xiaozhi-factory-backup.bin
+   esptool --port <esp32-serial-port> --baud 921600 read-flash 0x0 0x1000000 /tmp/xiaozhi-factory-backup.bin
    ```
 
 2. **Install ESP-IDF v5.5** via official installer:
@@ -62,13 +62,13 @@ Likely candidates (Xiaozhi alarm-clock form factor + ESP32-S3 N16R8):
 
 3. **Clone xiaozhi-esp32 v2.0.8**:
    ```bash
-   cd ~/projects && git clone https://github.com/78/xiaozhi-esp32.git xiaozhi-esp32-fork
+   cd <workspace-root> && git clone https://github.com/78/xiaozhi-esp32.git xiaozhi-esp32-fork
    cd xiaozhi-esp32-fork && git checkout v2.0.8  # (or matching tag)
    ```
 
 4. **Try serial monitor first** (read board name from boot log):
    ```bash
-   idf.py -p /dev/cu.usbmodem83101 monitor
+   idf.py -p <esp32-serial-port> monitor
    ```
    Look for: `Board:`, `Initializing display`, `GPIO_BUTTON_*`, `MCP-Xiao`, panel driver lines like `ST7789`, `GC9A01`, etc.
 
@@ -90,7 +90,7 @@ Likely candidates (Xiaozhi alarm-clock form factor + ESP32-S3 N16R8):
 8. **Quick µA sanity check**: with USB unplugged + USB power meter inline, observe idle current after firmware boots to a static screen. Note baseline.
 
 ## Todo List
-- [x] Factory flash backup preserved (`~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`, 16MB)
+- [x] Factory flash backup preserved (`<factory-backup-path>`, 16MB)
 - [x] ESP-IDF v5.5 installed, `idf.py --version` works
 - [x] xiaozhi-esp32 cloned; upstream has no `v2.0.8` tag, so `v2.0.5` was used as the closest 2.0.x baseline
 - [x] Board name identified (recorded in report)

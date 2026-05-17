@@ -18,7 +18,6 @@ Claude collector + session keeper ─┐
 Codex collector + session keeper  ─┘
 ```
 
-- Public dashboard/API: `https://vibecode.sonpython.com/`
 - API service: FastAPI + SQLite in `usage-api/`
 - Firmware: ESP-IDF + LVGL in `firmware/usage-monitor/`
 - Agent handoff: `AGENTS.md`, `docs/codex-memory.md`, `docs/session-sync.md`
@@ -28,7 +27,7 @@ Codex collector + session keeper  ─┘
 Hardware target:
 
 - ESP32-S3, 16 MB flash, 8 MB PSRAM
-- USB serial/JTAG port: `/dev/cu.usbmodem83101`
+- USB serial/JTAG port: `<esp32-serial-port>`
 - Display lineage: `xingzhi-cube-1.54tft-wifi`
 - LCD pins: SCLK `GPIO9`, MOSI `GPIO10`, CS `GPIO14`, DC `GPIO8`, reset `GPIO18`, backlight `GPIO13`
 - Power config: hold `GPIO21`, charge detect `GPIO38`, battery ADC `ADC_UNIT_2` / `ADC_CHANNEL_6`
@@ -39,7 +38,7 @@ Build and flash:
 cd firmware/usage-monitor
 source ~/esp/esp-idf-v5.5/export.sh
 idf.py build
-idf.py -p /dev/cu.usbmodem83101 flash monitor
+idf.py -p <esp32-serial-port> flash monitor
 ```
 
 Controls:
@@ -64,11 +63,6 @@ docker compose -f usage-api/docker-compose.yml up -d --build
 curl http://127.0.0.1:8080/healthz
 curl -H "X-Device-Secret: $DEVICE_SECRET" http://127.0.0.1:8080/status
 ```
-
-Deploy target used during development:
-
-- Docker host: `192.168.1.120`
-- Public route: Cloudflare Tunnel to `vibecode.sonpython.com`
 
 ## Collectors
 
@@ -102,7 +96,7 @@ Firmware verification is manual hardware validation:
 cd firmware/usage-monitor
 source ~/esp/esp-idf-v5.5/export.sh
 idf.py build
-idf.py -p /dev/cu.usbmodem83101 flash monitor
+idf.py -p <esp32-serial-port> flash monitor
 ```
 
 Expected boot logs include Wi-Fi connection, HTTP 200 from `/status`, and battery readings around `battery_raw=2450`, `battery_pct=100` when full/charging.

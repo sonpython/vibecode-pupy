@@ -12,8 +12,8 @@ The physical Xiaozhi device is confirmed as an ESP32-S3 N16R8-class board using 
 - Target: `esp32s3`
 - Flash: 16MB
 - PSRAM: 8MB
-- MAC: `a0:f2:62:e8:a4:40`
-- USB port: `/dev/cu.usbmodem83101`
+- MAC: `<device-mac>`
+- USB port: `<esp32-serial-port>`
 
 `xiaozhi-esp32` tag `v2.0.8` does not exist upstream. The nearest 2.0.x tag found is `v2.0.5`, which built successfully with ESP-IDF v5.5.
 
@@ -39,15 +39,15 @@ Verified:
 - `idf.py --version` -> `ESP-IDF v5.5`
 - `python scripts/release.py sp-esp32-s3-1.54-muma` completed
 - App binary size: `0x2a3e00`; smallest app partition: `0x3f0000`; 33% free
-- Release zip generated: `~/projects/xiaozhi-esp32-fork/releases/v2.0.5_sp-esp32-s3-1.54-muma.zip`
+- Release zip generated: `<workspace-root>/xiaozhi-esp32-fork/releases/v2.0.5_sp-esp32-s3-1.54-muma.zip`
 
 ## Flash Safety
 
 Existing factory backup preserved:
 
 ```text
-~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin
-SHA256 3a6a8a1f8a3a46be3993cd46ca3d0371c4003b953257995be0b2de789f6b583f
+<factory-backup-path>
+SHA256 <factory-backup-sha256>
 ```
 
 Fresh backup attempts on 2026-05-17 failed at both 921600 and 460800 baud with serial stream corruption. No new backup file was produced. The preserved factory backup remains the rollback source.
@@ -57,7 +57,7 @@ Fresh backup attempts on 2026-05-17 failed at both 921600 and 460800 baud with s
 Flashed stock `v2.0.5` build for `sp-esp32-s3-1.54-muma`:
 
 ```bash
-python -m esptool --chip esp32s3 -p /dev/cu.usbmodem83101 -b 460800 \
+python -m esptool --chip esp32s3 -p <esp32-serial-port> -b 460800 \
   --before default_reset --after hard_reset write_flash \
   --flash_mode dio --flash_size 16MB --flash_freq 80m \
   0x0 build/bootloader/bootloader.bin \
@@ -75,7 +75,7 @@ Boot log confirms:
 Project name: xiaozhi
 App version: 2.0.5
 ESP-IDF: v5.5
-Board: UUID=e1ce5437-8cfa-4421-8e89-d01eea51c2dc SKU=sp-esp32-s3-1.54-muma
+Board: UUID=<board-uuid> SKU=sp-esp32-s3-1.54-muma
 LcdDisplay: Turning display on
 LcdDisplay: Adding LCD display
 Backlight: Set brightness to 75
@@ -83,14 +83,14 @@ WifiConfigurationAp: Access Point started with SSID Xiaozhi-A441
 WifiConfigurationAp: Web server started
 ```
 
-The device reaches WiFi provisioning mode at AP `Xiaozhi-A441`, IP `192.168.4.1`.
+The device reaches WiFi provisioning mode at AP `Xiaozhi-A441`, IP `<setup-ap-ip>`.
 
 ## Pin Map From Upstream Board Profile
 
 Source files:
 
-- `~/projects/xiaozhi-esp32-fork/main/boards/sp-esp32-s3-1.54-muma/config.json`
-- `~/projects/xiaozhi-esp32-fork/main/boards/sp-esp32-s3-1.54-muma/sp-esp32-s3-1.54-muma.cc`
+- `<workspace-root>/xiaozhi-esp32-fork/main/boards/sp-esp32-s3-1.54-muma/config.json`
+- `<workspace-root>/xiaozhi-esp32-fork/main/boards/sp-esp32-s3-1.54-muma/sp-esp32-s3-1.54-muma.cc`
 
 Display and UI-relevant pins:
 

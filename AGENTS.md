@@ -22,7 +22,7 @@ Before doing any task in this workspace, run this ramp-up sequence:
 - Workspace: `vibecode-pupy`, personal AI tooling + hardware sandbox.
 - Active project: `esp32-usage-monitor`.
 - Status: planned, ready for Phase 01.
-- Hardware: Xiaozhi ESP32-S3 N16R8, MAC `a0:f2:62:e8:a4:40`, TTY `/dev/cu.usbmodem83101`.
+- Hardware: Xiaozhi ESP32-S3 N16R8, MAC `<device-mac>`, TTY `<esp32-serial-port>`.
 - Firmware state: factory firmware was backed up and flash was erased.
 - Active plan: `plans/260517-1045-esp32-usage-monitor/`.
 

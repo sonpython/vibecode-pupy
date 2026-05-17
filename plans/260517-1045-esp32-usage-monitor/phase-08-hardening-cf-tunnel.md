@@ -35,7 +35,7 @@ Expose Usage-API publicly via Cloudflare Tunnel so the ESP32 talks to a real HTT
 ```
 ESP32 ──HTTPS──> usage.<domain>.com (Cloudflare edge)
                           │
-                          └─Tunnel─► cloudflared container (Docker 192.168.1.120)
+                          └─Tunnel─► cloudflared container (Docker <docker-host-ip>)
                                               │
                                               └─► usage-api:8080 (Docker network)
 ```

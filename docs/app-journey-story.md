@@ -9,7 +9,7 @@
 
 ## TL;DR (60 giây)
 
-`vibecode-pupy` là sandbox workspace cá nhân của Michael Phan (sonunix@gmail.com) cho các side-project xoay quanh AI tooling + hardware. Project chính đang hoạt động: **ESP32 Xiaozhi → Claude/Codex usage monitor** — biến con robot Xiaozhi ESP32-S3 thành thiết bị desk gadget chỉ hiển thị usage Claude Code + Codex Cloud trên màn hình mỗi lần bấm nút. Workspace dùng ClaudeKit (kit `engineer`) + skill ecosystem rộng để brainstorm/plan/cook các project.
+`vibecode-pupy` là workspace cho các side-project xoay quanh AI tooling + hardware. Project chính đang hoạt động: **ESP32 Xiaozhi → Claude/Codex usage monitor** — biến con robot Xiaozhi ESP32-S3 thành thiết bị desk gadget chỉ hiển thị usage Claude Code + Codex Cloud trên màn hình mỗi lần bấm nút. Workspace dùng ClaudeKit (kit `engineer`) + skill ecosystem rộng để brainstorm/plan/cook các project.
 
 ---
 
@@ -32,7 +32,7 @@ vibecode-pupy/ (single-user personal)
 └── .claude/             # rules, skills config
 ```
 
-Owner: Michael Phan (sonunix@gmail.com).
+Owner: project owner.
 
 ---
 
@@ -40,7 +40,7 @@ Owner: Michael Phan (sonunix@gmail.com).
 
 1. Personal AI tooling — biến knowledge work workflows thành physical/ambient experiences.
 2. Reuse existing hardware before buying new (Xiaozhi clock = first example).
-3. Self-host khi possible (Proxmox/Docker @ 192.168.1.120 + Cloudflare Tunnel cho HTTPS).
+3. Self-host khi possible (Proxmox/Docker @ <docker-host-ip> + Cloudflare Tunnel cho HTTPS).
 
 ---
 
@@ -49,9 +49,9 @@ Owner: Michael Phan (sonunix@gmail.com).
 | System | Path / URL | Role |
 |---|---|---|
 | ClaudeKit | `~/.claude/` + `.claude/` in project | Brainstorm + plan + cook workflow |
-| Proxmox homelab | 192.168.1.120 (Docker host) | Services + agg layer |
+| Proxmox homelab | <docker-host-ip> (Docker host) | Services + agg layer |
 | Cloudflare Tunnel | `cloudflared` | HTTPS exposure for LAN services |
-| ESP32-S3 Xiaozhi | MAC `a0:f2:62:e8:a4:40`, TTY `/dev/cu.usbmodem83101` | Hardware target |
+| ESP32-S3 Xiaozhi | MAC `<device-mac>`, TTY `<esp32-serial-port>` | Hardware target |
 | ESP-IDF v5.5 | `~/esp/esp-idf` (planned) | Firmware toolchain |
 | `xiaozhi-esp32` v2.0.8 | github.com/78/xiaozhi-esp32 | Firmware base to fork |
 
@@ -74,7 +74,7 @@ Personal projects. No commercial scope.
 
 | Project | Status | Owner | Notes |
 |---|---|---|---|
-| esp32-usage-monitor | **planned** | sonunix | Plan `plans/260517-1045-esp32-usage-monitor/`. Hardware verified ESP32-S3 N16R8. Flash erased. Ready for Phase 01 (board variant identify + ESP-IDF setup). |
+| esp32-usage-monitor | **planned** | project owner | Plan `plans/260517-1045-esp32-usage-monitor/`. Hardware verified ESP32-S3 N16R8. Flash erased. Ready for Phase 01 (board variant identify + ESP-IDF setup). |
 
 ---
 

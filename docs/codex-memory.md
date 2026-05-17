@@ -99,7 +99,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
 - Serial monitor confirmed boot, top/reset button watches, Wi-Fi connection, HTTP 200, and `power battery_raw=2461 battery_pct=100 charge_gpio=0 charging=1`.
 
 **Files changed**
@@ -122,7 +122,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
 - Serial monitor confirmed boot, `top-fetch-gpio0 gpio=0 active=0 initial=1`, Wi-Fi connected, HTTP 200, and `power battery_raw=2460 battery_pct=100 charge_gpio=0 charging=1`.
 - Serial monitor also captured a top-button press: `button down top-fetch-gpio0`, `short press button=top-fetch-gpio0`, `manual fetch requested`, followed by another TLS/API fetch.
 
@@ -148,7 +148,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
 - Serial monitor confirmed boot, display init, GPIO39/GPIO40 button watches with initial level `1`, Wi-Fi connection, HTTP 200, and `power battery_raw=2461 battery_pct=100 charge_gpio=0 charging=1`.
 
 **Files changed**
@@ -165,7 +165,7 @@ Field `Actor` PHẢI chọn 1 trong:
 **Trigger**: User asked to scout source code and old firmware more carefully to find the real hardware config after battery raw ADC stayed around `28`.
 
 **What changed**
-- Re-scouted the old Xiaozhi source tree at `/Users/michaelphan/projects/xiaozhi-esp32-fork`.
+- Re-scouted the old Xiaozhi source tree at `<local-home>/projects/xiaozhi-esp32-fork`.
 - Confirmed the previously selected upstream build config was `BOARD_TYPE_SPOTPEAR_ESP32_S3_1_54_MUMA`, but that board's LCD pins do not match the physical device.
 - Matched the proven working LCD pin map to `xingzhi-cube-1.54tft-wifi`:
   - SCLK `GPIO9`, MOSI `GPIO10`, CS `GPIO14`, DC `GPIO8`, reset `GPIO18`, backlight `GPIO13`.
@@ -176,8 +176,8 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
-- Serial monitor confirmed the app booted, initialized display, connected to Wi-Fi `mp`, got IP `192.168.1.35`, fetched status with HTTP 200, and logged `power battery_raw=2455 battery_pct=100 charge_gpio=0 charging=1`.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed the app booted, initialized display, connected to Wi-Fi `<wifi-ssid>`, got IP `<device-lan-ip>`, fetched status with HTTP 200, and logged `power battery_raw=2455 battery_pct=100 charge_gpio=0 charging=1`.
 - This proves the real battery ADC is no longer the invalid MUMA `ADC_CHANNEL_0` path.
 
 **Files changed**
@@ -201,8 +201,8 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
-- Serial monitor confirmed new app booted with compile time `May 17 2026 15:55:48`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and logged `battery_raw=28 battery_pct=-1 charge_gpio=0 charging=1`.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:55:48`, connected to Wi-Fi at `<device-lan-ip>`, fetched status with HTTP 200, and logged `battery_raw=28 battery_pct=-1 charge_gpio=0 charging=1`.
 
 **Files changed**
 - `firmware/usage-monitor/main/main.c` — UPDATED, fallback display percent for invalid battery ADC when unplugged.
@@ -219,8 +219,8 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
-- Serial monitor confirmed new app booted with compile time `May 17 2026 15:52:48`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and continued reporting power state.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:52:48`, connected to Wi-Fi at `<device-lan-ip>`, fetched status with HTTP 200, and continued reporting power state.
 
 **Files changed**
 - `firmware/usage-monitor/main/brand_icons.c` — UPDATED, Claude icon color byte order.
@@ -237,8 +237,8 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Validation**
 - Rebuilt firmware with ESP-IDF v5.5 successfully.
-- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
-- Serial monitor confirmed new app booted with compile time `May 17 2026 15:49:04`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and continued reporting power state.
+- Flashed firmware to `<esp32-serial-port>`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:49:04`, connected to Wi-Fi at `<device-lan-ip>`, fetched status with HTTP 200, and continued reporting power state.
 
 **Files changed**
 - `firmware/usage-monitor/main/brand_icons.c` — UPDATED, Claude and Codex/OpenAI icon pixel maps.
@@ -282,13 +282,13 @@ Field `Actor` PHẢI chọn 1 trong:
 - Added `collectors/claude/parse_claude_curl.py` to convert browser cURL from `https://claude.ai/settings/usage` into ignored `secrets/claude_auth.json`.
 - Added `claude-session-keeper` Playwright service to keep claude.ai session warm and smoke-test the usage endpoint.
 - Updated Docker Compose: `claude-collector` reads `/secrets/claude_auth.json`; no longer mounts `/root/.claude`.
-- Deployed to Docker host `192.168.1.120`.
+- Deployed to Docker host `<docker-host-ip>`.
 
 **Validation**
 - `pytest -q collectors/claude collectors/codex usage-api/tests` -> `10 passed`
 - Local Claude web usage fetch -> HTTP 200, current/weekly percentages parsed.
 - Host `claude-session-keeper` log -> `page_status=200 usage_status=200`
-- `https://vibecode.sonpython.com/public/status` -> Claude `ok`, current `3`, weekly `5` at deploy time.
+- `https://<public-domain>/public/status` -> Claude `ok`, current `3`, weekly `5` at deploy time.
 
 **Files changed**
 - `collectors/claude/claude_collector.py` — UPDATED, Claude web usage API collector.
@@ -313,14 +313,14 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Actor**: codex-cli
 **Branch**: main
-**Trigger**: User asked whether deployment was actually on Docker host `192.168.1.120`, then reminded to add Playwright to keep the Codex session alive.
+**Trigger**: User asked whether deployment was actually on Docker host `<docker-host-ip>`, then reminded to add Playwright to keep the Codex session alive.
 
 ### ✅ Done
-- Confirmed previous live stack was still local Docker, not the `192.168.1.120` host.
-- Connected to `root@192.168.1.120`, copied the project runtime into `/opt/vibecode-pupy`, and deployed the usage stack there.
+- Confirmed previous live stack was still local Docker, not the `<docker-host-ip>` host.
+- Connected to `<docker-host>`, copied the project runtime into `/opt/vibecode-pupy`, and deployed the usage stack there.
 - Started host services: `usage-api`, `codex-collector`, `claude-collector`, `cloudflared`, and new `codex-session-keeper`.
 - Copied Claude usage project data to `/root/.claude/projects` on the host so host `claude-collector` can post fresh snapshots.
-- Stopped the local Docker Compose stack so `vibecode.sonpython.com` is served from the Docker host tunnel.
+- Stopped the local Docker Compose stack so `<public-domain>` is served from the Docker host tunnel.
 - Added a Playwright-based Codex session keeper that imports cookies/headers from `secrets/codex_auth.json`, opens Codex analytics, and calls `wham/usage` every 15 minutes.
 - Verified on host: Playwright keepalive logs `page_status=200 usage_status=200`; public API reports Claude/Codex `ok`.
 - Tweaked firmware UI: current usage percent now sits on the same row as the model name, aligned near the end of the current usage bar; current bar height increased from 10px to 14px and firmware was flashed.
@@ -448,7 +448,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### 📊 State changes (active projects)
 - ESP32 monitor firmware: black screen with guessed pins → flashed with factory-derived WonderBoy display map.
-- Factory backup: still preserved at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`.
+- Factory backup: still preserved at `<factory-backup-path>`.
 
 ### 🚨 Follow-ups
 - [ ] Visual confirmation still needs the human looking at the physical screen. If it is lit but wrong/blank, first swap LCD `DC`/`RST` between `GPIO8` and `GPIO18`; all other display pins are now evidence-based.
@@ -460,11 +460,11 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Actor**: codex-cli
 **Branch**: main
-**Trigger**: Continue after root monitor UI patch; user wanted `https://vibecode.sonpython.com/` to show a robot-like screen.
+**Trigger**: Continue after root monitor UI patch; user wanted `https://<public-domain>/` to show a robot-like screen.
 
 ### ✅ Done
 - Rebuilt and restarted the live `usage-api` Docker service behind the existing Cloudflare tunnel.
-- Verified `https://vibecode.sonpython.com/` serves the monitor HTML and `https://vibecode.sonpython.com/public/status` returns live Claude/Codex JSON.
+- Verified `https://<public-domain>/` serves the monitor HTML and `https://<public-domain>/public/status` returns live Claude/Codex JSON.
 - Fixed mobile horizontal overflow found via headless Chrome screenshots by tightening hero typography and stacking source badges on mobile.
 - Added cache-busting query versions to static asset links so Cloudflare/browser caches pick up the updated CSS/JS.
 - Re-tested API with `pytest -q usage-api/tests` after deploy.
@@ -484,7 +484,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Actor**: codex-cli
 **Branch**: main
-**Trigger**: User asked for a robot usage monitor web screen at `https://vibecode.sonpython.com/`
+**Trigger**: User asked for a robot usage monitor web screen at `https://<public-domain>/`
 
 ### ✅ Done
 - Added a root web UI for `usage-api` that resembles the ESP32 usage monitor: robot face, Claude/Codex current + weekly usage bars, source status badges, stale age, and live/error state.
@@ -522,13 +522,13 @@ Field `Actor` PHẢI chọn 1 trong:
 ### ✅ Done
 - Saved WiFi credentials into ignored local `firmware/secrets/wifi.env`.
 - Created minimal ESP-IDF firmware at `firmware/usage-monitor` for the confirmed `sp-esp32-s3-1.54-muma` board.
-- Firmware initializes ST7789 display pins, backlight, WiFi STA, HTTPS client with ESP x509 certificate bundle, and direct JSON parsing for `https://vibecode.sonpython.com/status`.
+- Firmware initializes ST7789 display pins, backlight, WiFi STA, HTTPS client with ESP x509 certificate bundle, and direct JSON parsing for `https://<public-domain>/status`.
 - `prepare_secrets.sh` generates ignored `main/secrets.h` from local WiFi env + `usage-api/.env` device secret.
 - Built firmware with ESP-IDF v5.5 and custom 4MB factory partition.
-- Flashed firmware to `/dev/cu.usbmodem83101`.
+- Flashed firmware to `<esp32-serial-port>`.
 - Serial verification:
-  - WiFi connected to `mp`.
-  - Device got IP `192.168.1.35`.
+  - WiFi connected to `<wifi-ssid>`.
+  - Device got IP `<device-lan-ip>`.
   - Cloudflare certificate validated.
   - `GET /status` returned HTTP 200 with 301-byte payload.
   - Device stayed running after fetch; no reboot after stack-size fix.
@@ -558,12 +558,12 @@ Field `Actor` PHẢI chọn 1 trong:
 
 **Actor**: codex-cli
 **Branch**: main
-**Trigger**: User confirmed Cloudflare hostname `https://vibecode.sonpython.com/`
+**Trigger**: User confirmed Cloudflare hostname `https://<public-domain>/`
 
 ### ✅ Done
 - Verified public Cloudflare route:
-  - `GET https://vibecode.sonpython.com/healthz` -> HTTP 200
-  - `GET https://vibecode.sonpython.com/status` with the current device secret -> HTTP 200
+  - `GET https://<public-domain>/healthz` -> HTTP 200
+  - `GET https://<public-domain>/status` with the current device secret -> HTTP 200
 - Rotated local API secrets from dev values to random production-style values in ignored `usage-api/.env`.
 - Recreated Docker services with the new secrets: `usage-api`, `codex-collector`, `cloudflared`.
 - Refreshed Claude collector once using the new local collector token.
@@ -576,7 +576,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### 🔑 Key decisions
 - Keep the production device secret out of chat and git; firmware generation should read it from local ignored config.
-- Use `https://vibecode.sonpython.com/status` as the ESP32 production API endpoint.
+- Use `https://<public-domain>/status` as the ESP32 production API endpoint.
 
 ### 📊 State changes (active projects)
 - Public usage API: domain unverified -> live via Cloudflare.
@@ -594,7 +594,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### ✅ Done
 - Saved Cloudflare tunnel token into ignored local `usage-api/.env` and started `cloudflared` with Docker Compose profile `tunnel`.
-- Verified tunnel container registered successfully with Cloudflare for tunnel ID `95c8a269-fcf8-4459-97ec-6d0b5e392571`.
+- Verified tunnel container registered successfully with Cloudflare for tunnel ID `<cloudflare-tunnel-id>`.
 - Updated Codex cURL parser to support Chrome's `curl -b '<cookie jar>'` form in addition to `-H 'Cookie: ...'`.
 - Parsed current browser auth from clipboard into ignored local `secrets/codex_auth.json`, restarted `codex-collector`, and verified `/status` now reports `codex.status=ok`.
 - Ran focused tests: `pytest -q collectors/codex/test_codex_collector.py` -> `3 passed`.
@@ -631,7 +631,7 @@ Field `Actor` PHẢI chọn 1 trong:
 - Posted a real Claude snapshot through `npx ccusage@latest` via `collectors/claude/claude_collector.py`; `/status` reports `claude.status=ok`.
 - Exercised Codex collector with invalid dev auth; `/status` reports `codex.status=auth_expired`, proving the degraded path is surfaced.
 - Installed/used ESP-IDF v5.5 from `~/esp/esp-idf-v5.5` with the Python 3.13 IDF env workaround.
-- Cloned `xiaozhi-esp32` into `~/projects/xiaozhi-esp32-fork`; upstream has no `v2.0.8` tag, so `v2.0.5` was used as the nearest 2.0.x baseline.
+- Cloned `xiaozhi-esp32` into `<workspace-root>/xiaozhi-esp32-fork`; upstream has no `v2.0.8` tag, so `v2.0.5` was used as the nearest 2.0.x baseline.
 - Built and flashed stock `xiaozhi-esp32` for `sp-esp32-s3-1.54-muma`; boot log confirms `SKU=sp-esp32-s3-1.54-muma`, LVGL/display/backlight/WiFi provisioning all start.
 - Wrote Phase 01 board-identification report with GPIO map, build/flash notes, and observed ES8311 audio NACK issue.
 
@@ -667,17 +667,17 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### ⚠ Blockers / open questions
 - Current Codex collector status is intentionally `auth_expired` because only fake dev auth is present.
-- Fresh full-flash backup retries failed due serial stream corruption; preserved factory backup remains available at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`.
+- Fresh full-flash backup retries failed due serial stream corruption; preserved factory backup remains available at `<factory-backup-path>`.
 
 ## 2026-05-17 11:50 SGT — git-init-and-origin-setup
 
 **Actor**: codex-cli
 **Branch**: main
-**Trigger**: User asked to create git repo, then provided remote `https://github.com/sonpython/vibecode-pupy`
+**Trigger**: User asked to create git repo, then provided remote `<git-remote-url>`
 
 ### ✅ Done
-- Initialized local git repository in `/Users/michaelphan/projects/vibecode-pupy` with default branch `main`.
-- Added remote `origin` pointing to `https://github.com/sonpython/vibecode-pupy`.
+- Initialized local git repository in `<local-home>/projects/vibecode-pupy` with default branch `main`.
+- Added remote `origin` pointing to `<git-remote-url>`.
 - Checked remote heads with `git ls-remote --heads origin`; remote currently has no branch heads, so initial push to `main` is safe.
 - Updated `.gitignore` so important project context (`.claude/`, `plans/`, docs, handoff files) can be tracked while runtime logs, session state, and virtualenv remain ignored.
 
@@ -699,7 +699,7 @@ Field `Actor` PHẢI chọn 1 trong:
 **Trigger**: User asked Codex to pull latest code, scout Claude/Codex handoff docs, add startup handoff rule, and map ClaudeKit assets for Codex use
 
 ### ✅ Done
-- Checked git state: `/Users/michaelphan/projects/vibecode-pupy` is not a git repository, so `git pull` cannot run until the workspace is initialized or cloned with `.git`.
+- Checked git state: `<local-home>/projects/vibecode-pupy` is not a git repository, so `git pull` cannot run until the workspace is initialized or cloned with `.git`.
 - Read current handoff/context docs: `docs/codex-memory.md`, `docs/session-sync.md`, `docs/app-journey-story.md`, `docs/codex-memory-protocol.md`, `docs/codex-starter-prompt.md`, `CLAUDE.md`, and active plan `plans/260517-1045-esp32-usage-monitor/plan.md`.
 - Synced ClaudeKit assets from project `.claude/` into Codex global directories: skills to `~/.codex/skills/`, agents/scripts/config to `~/.codex/claudekit/`, rules to `~/.codex/rules/claudekit/`, and plan templates to `~/.codex/templates/claudekit/plans/`.
 - Added root `AGENTS.md` with mandatory startup handoff protocol for Codex: check git/pull if possible, read memory/session/app-story/active-plan/rules, confirm state, and log state-changing sessions.
@@ -734,11 +734,11 @@ Field `Actor` PHẢI chọn 1 trong:
 **Trigger**: User invoked `/brainstorm` to convert existing Xiaozhi ESP32 alarm-clock robot into single-purpose desk gadget showing Claude/Codex usage percentages (5h block + weekly limits) on power-button press
 
 ### ✅ Done
-- Live USB probe → confirmed hardware: ESP32-S3 N16R8 (16MB flash + 8MB PSRAM, native USB-JTAG, MAC `a0:f2:62:e8:a4:40`), currently running `xiaozhi-esp32` v2.0.8 (github.com/78/xiaozhi-esp32, ESP-IDF v5.5, Mar 7 2026 build). TTY: `/dev/cu.usbmodem83101`.
+- Live USB probe → confirmed hardware: ESP32-S3 N16R8 (16MB flash + 8MB PSRAM, native USB-JTAG, MAC `<device-mac>`), currently running `xiaozhi-esp32` v2.0.8 (github.com/78/xiaozhi-esp32, ESP-IDF v5.5, Mar 7 2026 build). TTY: `<esp32-serial-port>`.
 - Discovered Codex Cloud has clean JSON API `GET https://chatgpt.com/backend-api/wham/usage` returning `rate_limit.primary_window.used_percent` + `secondary_window` + `reset_at` (unix ts). Auth: Bearer JWT (~10d TTL) + session cookies (`__Secure-next-auth.session-token`, `cf_clearance`, `_puid`). Replaces Playwright DOM scraping.
 - Wrote brainstorm summary at `plans/reports/brainstorm-260517-1045-esp32-usage-monitor.md` (15KB, 9 sections).
 - Created 8-phase implementation plan at `plans/260517-1045-esp32-usage-monitor/` (plan.md + phase-01..08 *.md, ~6.5d total effort).
-- Full flash backup at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin` (16MiB, SHA256 `3a6a8a1f8a3a46be3993cd46ca3d0371c4003b953257995be0b2de789f6b583f`).
+- Full flash backup at `<factory-backup-path>` (16MiB, SHA256 `<factory-backup-sha256>`).
 - `esptool erase-flash` (17s) to silence the Chinese-speaking factory firmware.
 - `memory init` — set up `docs/` from skill templates (no git so no commit/push).
 
@@ -750,7 +750,7 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### 🔑 Key decisions
 - **Firmware base**: fork `xiaozhi-esp32` v2.0.8 (strip audio/AI/cloud, keep WiFi+display+button+LVGL+wifi_provisioning). Not from-scratch ESP-IDF. Saves ~2d.
-- **Codex collector**: hit `/backend-api/wham/usage` directly (httpx + manual auth file), Docker container on 192.168.1.120, 5min poll, webhook on 401. Not Playwright. Saves ~2-3d vs scraping approach.
+- **Codex collector**: hit `/backend-api/wham/usage` directly (httpx + manual auth file), Docker container on <docker-host-ip>, 5min poll, webhook on 401. Not Playwright. Saves ~2-3d vs scraping approach.
 - **Claude collector**: `ccusage` CLI parsing local `~/.claude/projects/*.jsonl` on Mac via launchd timer (no public Claude usage API for subscription plans exists).
 - **Exposure**: Cloudflare Tunnel HTTPS to `usage.<domain>` (real TLS cert, ESP32 verifies via ESP-IDF cert bundle).
 - **No OTA** — USB-C re-flash acceptable for personal device.

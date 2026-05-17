@@ -10,7 +10,7 @@ dependencies: []
 # Phase 02: Usage-API Skeleton
 
 ## Overview
-Stand up a tiny FastAPI service in Docker on 192.168.1.120 with two endpoints (`POST /collect/{source}` from collectors, `GET /status` for ESP32) and SQLite storage of the latest per-source snapshot. Dummy data only — real collectors hook up in Phases 03/04.
+Stand up a tiny FastAPI service in Docker on <docker-host-ip> with two endpoints (`POST /collect/{source}` from collectors, `GET /status` for ESP32) and SQLite storage of the latest per-source snapshot. Dummy data only — real collectors hook up in Phases 03/04.
 
 ## Context Links
 - Brainstorm §5.3
@@ -116,7 +116,7 @@ CREATE TABLE snapshots (
 - [ ] app.py with both endpoints + auth + SQLite
 - [ ] Dockerfile + docker-compose.yml
 - [ ] Smoke test passes both endpoints
-- [ ] Deployed on 192.168.1.120 (loopback for now)
+- [ ] Deployed on <docker-host-ip> (loopback for now)
 
 ## Success Criteria
 - [ ] POST + GET work via curl
