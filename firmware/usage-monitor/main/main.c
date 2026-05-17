@@ -46,14 +46,11 @@
 #define PIN_POWER_EN GPIO_NUM_NC
 #define HAS_POWER_EN 0
 #define PIN_BUTTON GPIO_NUM_5
-#define PIN_CHARGE_STATUS GPIO_NUM_48
+#define PIN_CHARGE_STATUS GPIO_NUM_41
 #define HAS_CHARGE_STATUS 1
-#define BATTERY_ADC_CHANNEL ADC_CHANNEL_6
-#define USB_ADC_CHANNEL ADC_CHANNEL_0
+#define BATTERY_ADC_CHANNEL ADC_CHANNEL_0
 #define BATTERY_ADC_SAMPLES 8
 #define BATTERY_VALID_MIN_RAW 1200
-#define USB_PRESENT_MIN_RAW 1500
-#define USB_PRESENT_MAX_RAW 4000
 #define BUTTON_POLL_MS 100
 #define BUTTON_REFRESH_COOLDOWN_MS 800
 #define STATUS_REFRESH_WAIT_MS (60 * 1000)
@@ -98,7 +95,6 @@ typedef struct {
 typedef struct {
     int battery_pct;
     int battery_raw;
-    int usb_raw;
     int charge_gpio;
     bool charging;
     bool has_battery;
@@ -314,7 +310,6 @@ static power_status_t read_power_status(void)
     power_status_t power = {
         .battery_pct = -1,
         .battery_raw = -1,
-        .usb_raw = -1,
         .charge_gpio = -1,
         .charging = false,
         .has_battery = false,
@@ -339,11 +334,6 @@ static power_status_t read_power_status(void)
         }
     }
 
-    int usb_raw = 0;
-    if (s_adc_handle && adc_oneshot_read(s_adc_handle, USB_ADC_CHANNEL, &usb_raw) == ESP_OK) {
-        power.usb_raw = usb_raw;
-        power.charging = usb_raw > USB_PRESENT_MIN_RAW && usb_raw < USB_PRESENT_MAX_RAW;
-    }
 #if HAS_CHARGE_STATUS
     power.charge_gpio = gpio_get_level(PIN_CHARGE_STATUS);
     power.charging = power.charging || power.charge_gpio == 1;
@@ -352,10 +342,9 @@ static power_status_t read_power_status(void)
 
     ESP_LOGI(
         TAG,
-        "power battery_raw=%d battery_pct=%d usb_raw=%d charge_gpio=%d charging=%d",
+        "power battery_raw=%d battery_pct=%d charge_gpio=%d charging=%d",
         power.battery_raw,
         power.battery_pct,
-        power.usb_raw,
         power.charge_gpio,
         power.charging);
     return power;
@@ -367,7 +356,7 @@ static void update_power_status(const power_status_t *power)
         return;
     }
     if (!power->has_battery) {
-        lv_label_set_text(s_power_status, power->charging ? LV_SYMBOL_CHARGE " --" : LV_SYMBOL_BATTERY_EMPTY " --");
+        lv_label_set_text(s_power_status, power->charging ? LV_SYMBOL_CHARGE " 100%" : LV_SYMBOL_BATTERY_EMPTY " --");
         lv_obj_set_style_text_color(
             s_power_status,
             power->charging ? lv_color_hex(0x55d2ff) : lv_color_hex(0x909aaa),
@@ -384,7 +373,7 @@ static void update_power_status(const power_status_t *power)
     } else if (power->battery_pct >= 10) {
         battery_symbol = LV_SYMBOL_BATTERY_1;
     }
-    set_label(s_power_status, "%s %d", power->charging ? LV_SYMBOL_CHARGE : battery_symbol, power->battery_pct);
+    set_label(s_power_status, "%s %d%%", power->charging ? LV_SYMBOL_CHARGE : battery_symbol, power->battery_pct);
     lv_obj_set_style_text_color(
         s_power_status,
         power->charging ? lv_color_hex(0x55d2ff) : pct_color(100 - power->battery_pct),
@@ -845,7 +834,6 @@ static void init_power_monitor(void)
         .bitwidth = ADC_BITWIDTH_12,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, BATTERY_ADC_CHANNEL, &chan_cfg));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, USB_ADC_CHANNEL, &chan_cfg));
 }
 
 void app_main(void)

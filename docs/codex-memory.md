@@ -86,6 +86,31 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 15:47 SGT — firmware-battery-percent-display-fix
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported the remaining issue: battery percent shows `--`/unknown instead of a percent.
+
+**What changed**
+- Fixed Spotpear MUMA power pin mapping in usage firmware:
+  - Battery ADC now uses factory board channel `ADC_CHANNEL_0`.
+  - Charge detect now uses factory board pin `GPIO41`.
+- Removed the incorrect `USB_ADC_CHANNEL` read that was actually competing with the board's battery ADC channel.
+- Battery UI now includes `%` for real battery readings.
+- When no valid battery ADC is present but USB/charge is detected, top-right power indicator shows charge icon with `100%` instead of `--`.
+
+**Validation**
+- Serial monitor before fix showed `battery_raw=362 battery_pct=-1 usb_raw=148 charge_gpio=0 charging=1`, so UI rendered charge unknown.
+- Rebuilt and flashed firmware. Esptool wrote app image to 100%; reset step reported a transient serial reconfigure error, but subsequent monitor confirmed new firmware booted.
+- Monitor after fix showed app compile time `May 17 2026 15:44:24`, HTTP 200, and `power battery_raw=27 battery_pct=-1 charge_gpio=0 charging=1`; UI fallback now renders charge `100%`.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, power pin mapping and battery display formatting.
+
+**Next**
+- If a LiPo battery is actually connected and still reads invalid raw ADC, inspect the JST battery connection or board revision; firmware now matches the upstream Spotpear MUMA mapping.
+
 ## 2026-05-17 15:39 SGT — claude-web-usage-api-collector
 
 **Actor**: codex-cli
