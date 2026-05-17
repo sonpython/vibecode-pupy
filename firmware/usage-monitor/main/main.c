@@ -415,7 +415,7 @@ static void update_fetch_status(bool fetching, bool ok)
         lv_label_set_text(s_fetch_status, LV_SYMBOL_REFRESH);
         lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0x55d2ff), 0);
         if (s_header_status) {
-            lv_label_set_text(s_header_status, "FETCH");
+            lv_label_set_text(s_header_status, "FETCHING");
             lv_obj_set_style_text_color(s_header_status, lv_color_hex(0x55d2ff), 0);
         }
         return;
@@ -912,7 +912,7 @@ static bool handle_button_action(button_action_t action)
     if (action == BUTTON_ACTION_TOGGLE_DISPLAY) {
         set_display_enabled(!s_display_enabled);
         if (s_display_enabled && !s_wifi_ap_mode) {
-            ui_show_message("FETCH", "manual");
+            ui_set_fetching(true);
         }
         return true;
     }
@@ -921,7 +921,7 @@ static bool handle_button_action(button_action_t action)
             set_display_enabled(true);
         }
         if (!s_wifi_ap_mode) {
-            ui_show_message("FETCH", "manual");
+            ui_set_fetching(true);
             ESP_LOGI(TAG, "manual fetch requested");
             return true;
         }

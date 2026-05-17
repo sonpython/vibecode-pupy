@@ -86,6 +86,26 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:27 SGT — firmware-manual-fetch-inline-status
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked not to show the flashing/full-screen manual fetch screen; only update the bottom status line to fetching.
+
+**What changed**
+- Removed `ui_show_message("FETCH", "manual")` from manual fetch and display-toggle wake paths.
+- Manual fetch now keeps the current status screen visible and only calls `ui_set_fetching(true)`.
+- Fetching footer text now shows `FETCHING` instead of `FETCH`.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, top/reset button watches, Wi-Fi connection, HTTP 200, and `power battery_raw=2461 battery_pct=100 charge_gpio=0 charging=1`.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, inline manual fetch status.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 16:24 SGT — firmware-restore-top-fetch-button
 
 **Actor**: codex-cli
