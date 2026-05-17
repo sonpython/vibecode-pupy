@@ -32,6 +32,8 @@
 #define LCD_HEIGHT 240
 #define LCD_OFFSET_X 20
 #define LCD_OFFSET_Y 0
+#define LCD_PIXEL_CLOCK_HZ (20 * 1000 * 1000)
+#define LCD_DRAW_BUFFER_LINES 20
 #define PIN_LCD_SCLK GPIO_NUM_9
 #define PIN_LCD_MOSI GPIO_NUM_10
 #define PIN_LCD_CS GPIO_NUM_14
@@ -306,14 +308,14 @@ static void init_display(void)
         .miso_io_num = GPIO_NUM_NC,
         .quadwp_io_num = GPIO_NUM_NC,
         .quadhd_io_num = GPIO_NUM_NC,
-        .max_transfer_sz = LCD_WIDTH * LCD_HEIGHT * sizeof(uint16_t),
+        .max_transfer_sz = LCD_WIDTH * LCD_DRAW_BUFFER_LINES * sizeof(uint16_t),
     };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
 
     esp_lcd_panel_io_spi_config_t io_config = {
         .dc_gpio_num = PIN_LCD_DC,
         .cs_gpio_num = PIN_LCD_CS,
-        .pclk_hz = 60 * 1000 * 1000,
+        .pclk_hz = LCD_PIXEL_CLOCK_HZ,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
         .spi_mode = 0,
@@ -330,8 +332,6 @@ static void init_display(void)
     ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, true, false));
     ESP_ERROR_CHECK(esp_lcd_panel_set_gap(s_panel, LCD_OFFSET_X, LCD_OFFSET_Y));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
 
@@ -344,14 +344,15 @@ static void init_display(void)
     const lvgl_port_display_cfg_t display_cfg = {
         .io_handle = s_panel_io,
         .panel_handle = s_panel,
-        .buffer_size = LCD_WIDTH * 40,
-        .double_buffer = true,
+        .buffer_size = LCD_WIDTH * LCD_DRAW_BUFFER_LINES,
+        .double_buffer = false,
         .hres = LCD_WIDTH,
         .vres = LCD_HEIGHT,
         .monochrome = false,
+        .color_format = LV_COLOR_FORMAT_RGB565,
         .rotation = {
-            .swap_xy = false,
-            .mirror_x = false,
+            .swap_xy = true,
+            .mirror_x = true,
             .mirror_y = false,
         },
         .flags = {
