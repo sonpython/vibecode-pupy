@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Hardware identify + ESP-IDF toolchain"
-status: pending
+status: done
 priority: P1
 effort: "0.5d"
 dependencies: []
@@ -90,18 +90,18 @@ Likely candidates (Xiaozhi alarm-clock form factor + ESP32-S3 N16R8):
 8. **Quick µA sanity check**: with USB unplugged + USB power meter inline, observe idle current after firmware boots to a static screen. Note baseline.
 
 ## Todo List
-- [ ] Flash backup taken (`/tmp/xiaozhi-factory-backup.bin`, 16MB)
-- [ ] ESP-IDF v5.5 installed, `idf.py --version` works
-- [ ] xiaozhi-esp32 cloned at v2.0.8
-- [ ] Board name identified (recorded in report)
-- [ ] Display + button + battery pins documented
-- [ ] Stock rebuild flashes successfully + boots
+- [x] Factory flash backup preserved (`~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`, 16MB)
+- [x] ESP-IDF v5.5 installed, `idf.py --version` works
+- [x] xiaozhi-esp32 cloned; upstream has no `v2.0.8` tag, so `v2.0.5` was used as the closest 2.0.x baseline
+- [x] Board name identified (recorded in report)
+- [x] Display + button + battery pins documented
+- [x] Stock rebuild flashes successfully + boots
 - [ ] Idle current baseline noted
 
 ## Success Criteria
-- [ ] Report file lists exact board name with all GPIO assignments
-- [ ] `idf.py build` succeeds against the identified board config
-- [ ] Device still boots stock Xiaozhi after rebuild (confirms toolchain + board choice)
+- [x] Report file lists exact board name with all GPIO assignments
+- [x] `idf.py build` succeeds against the identified board config
+- [x] Device still boots stock Xiaozhi after rebuild (confirms toolchain + board choice)
 
 ## Risk Assessment
 | Risk | Mitigation |

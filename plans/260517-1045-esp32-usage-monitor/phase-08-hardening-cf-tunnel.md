@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Hardening and Cloudflare Tunnel"
-status: pending
+status: scaffolded
 priority: P2
 effort: "0.5d"
 dependencies: [2, 3, 4]

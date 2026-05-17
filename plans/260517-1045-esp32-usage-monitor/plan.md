@@ -1,7 +1,7 @@
 ---
 title: "ESP32 Xiaozhi → Claude/Codex usage monitor"
 slug: esp32-usage-monitor
-status: pending
+status: in_progress
 priority: P2
 effort: "6.5d"
 created: 2026-05-17
@@ -25,14 +25,14 @@ codex-collector  ──>   cloudflared tunnel            <──      LVGL UI + 
 
 | # | Phase | Effort | Status | Blocker |
 |---|---|---|---|---|
-| 01 | [Hardware identify + ESP-IDF toolchain](./phase-01-hardware-identify.md) | 0.5d | pending | — |
-| 02 | [Usage-API skeleton](./phase-02-usage-api-skeleton.md) | 0.5d | pending | — |
-| 03 | [Claude collector (ccusage)](./phase-03-claude-collector.md) | 0.5d | pending | 02 |
-| 04 | [Codex collector (wham/usage API)](./phase-04-codex-collector.md) | 0.5-1d | pending | 02 |
+| 01 | [Hardware identify + ESP-IDF toolchain](./phase-01-hardware-identify.md) | 0.5d | done | — |
+| 02 | [Usage-API skeleton](./phase-02-usage-api-skeleton.md) | 0.5d | done | — |
+| 03 | [Claude collector (ccusage)](./phase-03-claude-collector.md) | 0.5d | local done | 02 |
+| 04 | [Codex collector (wham/usage API)](./phase-04-codex-collector.md) | 0.5-1d | local done; auth needed | 02 |
 | 05 | [Firmware fork + strip](./phase-05-firmware-fork-and-strip.md) | 1d | pending | 01 |
 | 06 | [ESP32 usage UI (LVGL)](./phase-06-esp32-usage-ui.md) | 1.5d | pending | 02, 05 |
 | 07 | [Deep sleep + button wake](./phase-07-deep-sleep-button-wake.md) | 1d | pending | 06 |
-| 08 | [Hardening + Cloudflare Tunnel](./phase-08-hardening-cf-tunnel.md) | 0.5d | pending | 02, 03, 04 |
+| 08 | [Hardening + Cloudflare Tunnel](./phase-08-hardening-cf-tunnel.md) | 0.5d | scaffolded | 02, 03, 04 |
 
 Critical path: 01 → 05 → 06 → 07 (firmware track, ~4d). API track (02 → 03/04 → 08) runs parallel.
 
@@ -47,10 +47,10 @@ Critical path: 01 → 05 → 06 → 07 (firmware track, ~4d). API track (02 → 
 
 ## Open Items (resolved in Phase 01)
 
-- Exact xiaozhi-esp32 board variant name (match against upstream `main/boards/*`)
-- Display controller + resolution + GPIO map (Alibaba spec of 1024×768 AMOLED is marketing fiction)
-- Button power GPIO + RTC wake capability
-- Deep-sleep current measurement vs. <100µA target
+- Exact xiaozhi-esp32 board variant name: `sp-esp32-s3-1.54-muma`, confirmed by boot log.
+- Display resolution + GPIO map: recorded in `reports/phase-01-board-identification.md`.
+- Button power GPIO: GPIO0, RTC-capable candidate.
+- Deep-sleep current measurement vs. <100µA target: still pending hardware meter validation.
 
 ## Source Documents
 

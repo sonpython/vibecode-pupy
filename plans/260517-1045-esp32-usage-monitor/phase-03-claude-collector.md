@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Claude collector (ccusage on Mac)"
-status: pending
+status: local done
 priority: P1
 effort: "0.5d"
 dependencies: [2]

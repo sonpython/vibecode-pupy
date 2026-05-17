@@ -45,6 +45,10 @@ pnpm-lock.yaml
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+secrets/
+usage-api/data/
+usage-api/cloudflared/*.json
+usage-api/cloudflared/*.pem
 
 # vercel
 .vercel

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.user.claude-collector</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>__PROJECT_DIR__/collectors/claude/claude_collector.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_DIR__/collectors/claude</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>USAGE_API_URL</key>
+    <string>http://127.0.0.1:8080</string>
+    <key>CLAUDE_COLLECTOR_TOKEN</key>
+    <string>replace-with-random-token</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>60</integer>
+  <key>AbandonProcessGroup</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/claude-collector.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/claude-collector.log</string>
+</dict>
+</plist>

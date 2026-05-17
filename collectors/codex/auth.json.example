@@ -1,0 +1,13 @@
+{
+  "bearer": "paste-jwt-bearer-token",
+  "cookies": {
+    "__Secure-next-auth.session-token": "paste-session-cookie",
+    "cf_clearance": "paste-cloudflare-clearance-cookie",
+    "_puid": "paste-puid-if-present"
+  },
+  "headers": {
+    "user-agent": "Mozilla/5.0 ...",
+    "oai-device-id": "paste-if-present",
+    "oai-client-version": "paste-if-present"
+  }
+}

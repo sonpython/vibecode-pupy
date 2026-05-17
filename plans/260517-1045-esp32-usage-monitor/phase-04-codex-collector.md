@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Codex collector (wham/usage JSON API)"
-status: pending
+status: local done; auth needed
 priority: P1
 effort: "0.5-1d"
 dependencies: [2]

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Usage-API skeleton (FastAPI + SQLite)"
-status: pending
+status: done
 priority: P1
 effort: "0.5d"
 dependencies: []

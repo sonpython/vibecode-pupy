@@ -86,6 +86,57 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 12:15 SGT — usage-monitor-local-stack-and-board-baseline
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User said they were going to sleep and asked Codex to follow the plan sequentially, test carefully, self-decide, with Docker running and ESP32 plugged in
+
+### ✅ Done
+- Implemented the local usage-monitor stack: FastAPI + SQLite API, Docker Compose, Claude collector, Codex collector, auth-refresh helper, Cloudflare tunnel scaffold, launchd/smoke-test templates, and top-level README.
+- Verified API/collector tests: `pytest -q usage-api/tests collectors/claude collectors/codex` -> `6 passed`.
+- Brought up Docker services: `usage-api` on `127.0.0.1:8080` and `codex-collector` container.
+- Posted a real Claude snapshot through `npx ccusage@latest` via `collectors/claude/claude_collector.py`; `/status` reports `claude.status=ok`.
+- Exercised Codex collector with invalid dev auth; `/status` reports `codex.status=auth_expired`, proving the degraded path is surfaced.
+- Installed/used ESP-IDF v5.5 from `~/esp/esp-idf-v5.5` with the Python 3.13 IDF env workaround.
+- Cloned `xiaozhi-esp32` into `~/projects/xiaozhi-esp32-fork`; upstream has no `v2.0.8` tag, so `v2.0.5` was used as the nearest 2.0.x baseline.
+- Built and flashed stock `xiaozhi-esp32` for `sp-esp32-s3-1.54-muma`; boot log confirms `SKU=sp-esp32-s3-1.54-muma`, LVGL/display/backlight/WiFi provisioning all start.
+- Wrote Phase 01 board-identification report with GPIO map, build/flash notes, and observed ES8311 audio NACK issue.
+
+### 📁 Files changed
+- `usage-api/*` — NEW, API, Dockerfile, compose, tests, examples
+- `collectors/claude/*` — NEW, ccusage collector, launchd template, installer, tests
+- `collectors/codex/*` — NEW, wham/usage collector, auth cURL parser, Dockerfile, docs, tests
+- `ops/*` — NEW, daily smoke-test script and launchd installer/template
+- `README.md` — NEW, setup/runbook for the local stack
+- `plans/260517-1045-esp32-usage-monitor/*` — UPDATED, phase statuses and Phase 01 report
+- `.gitignore` — UPDATED, ignore local secrets/runtime data for the new stack
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry
+
+### 🔑 Key decisions
+- Keep API/collector credentials outside git in ignored `.env`, `secrets/`, and `usage-api/data/`.
+- Leave Docker `usage-api` + `codex-collector` running with dev credentials so local `/status` is immediately inspectable.
+- Do not claim Codex usage is live until real browser auth is placed into `secrets/codex_auth.json`.
+- Treat stock audio codec errors as non-blocking because the target firmware should remove audio entirely in Phase 05.
+
+### 📊 State changes (active projects)
+- esp32-usage-monitor Phase 01: pending -> done.
+- Phase 02: pending -> done locally with Docker.
+- Phase 03: pending -> local done with live Claude snapshot.
+- Phase 04: pending -> local done, blocked only by real Codex auth refresh.
+- Phase 08: pending -> scaffolded; production Cloudflare tunnel still needs user domain/token.
+
+### 🚨 Follow-ups
+- [ ] Replace dev `secrets/codex_auth.json` with real ChatGPT browser auth using `collectors/codex/README-auth-refresh.md`.
+- [ ] Replace dev tokens in `usage-api/.env` with production random values before exposing the API.
+- [ ] Configure Cloudflare Tunnel token/domain if ESP32 must fetch outside LAN.
+- [ ] Start Phase 05: create stripped usage-monitor firmware from `sp-esp32-s3-1.54-muma`, removing audio/Xiaozhi cloud while preserving WiFi/LVGL/button/battery.
+- [ ] Measure idle/deep-sleep current with a meter; this could not be validated from software.
+
+### ⚠ Blockers / open questions
+- Current Codex collector status is intentionally `auth_expired` because only fake dev auth is present.
+- Fresh full-flash backup retries failed due serial stream corruption; preserved factory backup remains available at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin`.
+
 ## 2026-05-17 11:50 SGT — git-init-and-origin-setup
 
 **Actor**: codex-cli

@@ -1,0 +1,7 @@
+tunnel: usage-monitor
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: usage.example.com
+    service: http://usage-api:8080
+  - service: http_status:404

@@ -1,0 +1,32 @@
+services:
+  usage-api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/data
+
+  codex-collector:
+    build:
+      context: ../collectors/codex
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      USAGE_API_URL: http://usage-api:8080
+      CODEX_AUTH_FILE: /secrets/codex_auth.json
+      POLL_INTERVAL_SEC: ${POLL_INTERVAL_SEC:-300}
+      AUTH_ALERT_WEBHOOK: ${AUTH_ALERT_WEBHOOK:-}
+    volumes:
+      - ../secrets:/secrets:ro
+    depends_on:
+      - usage-api
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:-}
+    depends_on:
+      - usage-api
