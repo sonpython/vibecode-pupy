@@ -86,6 +86,27 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 15:54 SGT — firmware-brand-icon-color-fix
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported the brand logos/colors were wrong: Claude Code should be orange crab-style, Codex should be black/white OpenAI-style.
+
+**What changed**
+- Replaced the Claude icon bitmap with a compact 32x32 orange crab-style mark for the tiny LVGL screen.
+- Recolored the Codex/OpenAI bitmap to white while preserving its alpha mask, so it reads as black/white on the dark interface instead of cyan.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:49:04`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and continued reporting power state.
+
+**Files changed**
+- `firmware/usage-monitor/main/brand_icons.c` — UPDATED, Claude and Codex/OpenAI icon pixel maps.
+
+**Next**
+- Visually confirm on the physical LCD that the icon silhouettes match expectations; firmware and flash validation are complete.
+
 ## 2026-05-17 15:47 SGT — firmware-battery-percent-display-fix
 
 **Actor**: codex-cli
