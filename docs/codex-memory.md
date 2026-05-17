@@ -86,6 +86,36 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:12 SGT — firmware-xingzhi-power-config
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to scout source code and old firmware more carefully to find the real hardware config after battery raw ADC stayed around `28`.
+
+**What changed**
+- Re-scouted the old Xiaozhi source tree at `/Users/michaelphan/projects/xiaozhi-esp32-fork`.
+- Confirmed the previously selected upstream build config was `BOARD_TYPE_SPOTPEAR_ESP32_S3_1_54_MUMA`, but that board's LCD pins do not match the physical device.
+- Matched the proven working LCD pin map to `xingzhi-cube-1.54tft-wifi`:
+  - SCLK `GPIO9`, MOSI `GPIO10`, CS `GPIO14`, DC `GPIO8`, reset `GPIO18`, backlight `GPIO13`.
+- Ported the xingzhi power config into usage firmware:
+  - power hold `GPIO21`
+  - charge detect `GPIO38`
+  - battery ADC `ADC_UNIT_2` / `ADC_CHANNEL_6`
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed the app booted, initialized display, connected to Wi-Fi `mp`, got IP `192.168.1.35`, fetched status with HTTP 200, and logged `power battery_raw=2455 battery_pct=100 charge_gpio=0 charging=1`.
+- This proves the real battery ADC is no longer the invalid MUMA `ADC_CHANNEL_0` path.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, xingzhi-derived power/charge/battery ADC pin mapping.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+**Key decisions**
+- Treat `xingzhi-cube-1.54tft-wifi` as the hardware lineage for this device's display and power config, despite the old build folder showing MUMA selected.
+- Do not revert to MUMA power pins unless a later live probe disproves the xingzhi config.
+
 ## 2026-05-17 16:03 SGT — firmware-battery-unplugged-fallback
 
 **Actor**: codex-cli

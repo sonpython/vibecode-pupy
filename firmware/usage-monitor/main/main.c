@@ -43,12 +43,13 @@
 #define PIN_LCD_RST GPIO_NUM_18
 #define PIN_BACKLIGHT GPIO_NUM_13
 #define HAS_BACKLIGHT 1
-#define PIN_POWER_EN GPIO_NUM_NC
-#define HAS_POWER_EN 0
+#define PIN_POWER_EN GPIO_NUM_21
+#define HAS_POWER_EN 1
 #define PIN_BUTTON GPIO_NUM_5
-#define PIN_CHARGE_STATUS GPIO_NUM_41
+#define PIN_CHARGE_STATUS GPIO_NUM_38
 #define HAS_CHARGE_STATUS 1
-#define BATTERY_ADC_CHANNEL ADC_CHANNEL_0
+#define BATTERY_ADC_UNIT ADC_UNIT_2
+#define BATTERY_ADC_CHANNEL ADC_CHANNEL_6
 #define BATTERY_ADC_SAMPLES 8
 #define BATTERY_VALID_MIN_RAW 1200
 #define BUTTON_POLL_MS 100
@@ -831,7 +832,7 @@ static void init_power_monitor(void)
 #endif
 
     adc_oneshot_unit_init_cfg_t unit_cfg = {
-        .unit_id = ADC_UNIT_1,
+        .unit_id = BATTERY_ADC_UNIT,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &s_adc_handle));
