@@ -9,6 +9,7 @@
 #include "esp_check.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -48,6 +49,8 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num;
 static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_panel_io;
+static uint16_t *s_framebuffer;
+static uint16_t *s_flush_buffer;
 
 typedef struct {
     int current_pct;
@@ -76,7 +79,7 @@ static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 
 static void lcd_draw_rect(int x, int y, int w, int h, uint16_t color)
 {
-    if (w <= 0 || h <= 0 || !s_panel) {
+    if (w <= 0 || h <= 0) {
         return;
     }
     x = MAX(0, MIN(x, LCD_WIDTH - 1));
@@ -84,6 +87,19 @@ static void lcd_draw_rect(int x, int y, int w, int h, uint16_t color)
     w = MIN(w, LCD_WIDTH - x);
     h = MIN(h, LCD_HEIGHT - y);
 
+    if (s_framebuffer) {
+        for (int row = 0; row < h; row++) {
+            uint16_t *line = s_framebuffer + (y + row) * LCD_WIDTH + x;
+            for (int col = 0; col < w; col++) {
+                line[col] = color;
+            }
+        }
+        return;
+    }
+
+    if (!s_panel) {
+        return;
+    }
     uint16_t *line = heap_caps_malloc(w * sizeof(uint16_t), MALLOC_CAP_DMA);
     if (!line) {
         return;
@@ -95,6 +111,26 @@ static void lcd_draw_rect(int x, int y, int w, int h, uint16_t color)
         esp_lcd_panel_draw_bitmap(s_panel, x, y + row, x + w, y + row + 1, line);
     }
     free(line);
+}
+
+static void lcd_flush(void)
+{
+    if (!s_panel || !s_framebuffer) {
+        return;
+    }
+    if (!s_flush_buffer) {
+        esp_lcd_panel_draw_bitmap(s_panel, 0, 0, LCD_WIDTH, LCD_HEIGHT, s_framebuffer);
+        return;
+    }
+
+    const int chunk_h = 20;
+    for (int y = 0; y < LCD_HEIGHT; y += chunk_h) {
+        int h = MIN(chunk_h, LCD_HEIGHT - y);
+        for (int row = 0; row < h; row++) {
+            memcpy(s_flush_buffer + row * LCD_WIDTH, s_framebuffer + (y + row) * LCD_WIDTH, LCD_WIDTH * sizeof(uint16_t));
+        }
+        esp_lcd_panel_draw_bitmap(s_panel, 0, y, LCD_WIDTH, y + h, s_flush_buffer);
+    }
 }
 
 static const uint8_t *glyph5x7(char c)
@@ -166,6 +202,39 @@ static void draw_text(int x, int y, const char *text, uint16_t color, int scale)
     }
 }
 
+static const uint32_t ICON_CLAUDE[32] = {
+    0x00e00000u, 0x01f07000u, 0x01f07800u, 0x00f87020u,
+    0x00f870f0u, 0x007871f0u, 0x1c7c73f0u, 0x3e3c73e0u,
+    0x1f1ee7e0u, 0x1fdeefc0u, 0x07ffff80u, 0x03ffff00u,
+    0x00ffff02u, 0x007ffe7fu, 0x001fffffu, 0xfffffffcu,
+    0xffffffc0u, 0x07fffffcu, 0x001fffffu, 0x007fffffu,
+    0x01fffe1fu, 0x03ffff00u, 0x0fcfffc0u, 0x1f1ddfe0u,
+    0x1e39def0u, 0x0079cf78u, 0x00f1c798u, 0x00e38780u,
+    0x01c38380u, 0x01838180u, 0x00038000u, 0x00038000u,
+};
+
+static const uint32_t ICON_OPENAI[32] = {
+    0x001fc000u, 0x003ff000u, 0x00fffb00u, 0x00f07fc0u,
+    0x01c0fff0u, 0x03c1f8f8u, 0x0f87e03cu, 0x1f9f801cu,
+    0x3f9e1e0eu, 0x7b987f8eu, 0x7398f7eeu, 0xe39be1feu,
+    0xe39ff0feu, 0xe39e3c3eu, 0xe3981f0eu, 0xe3981fc7u,
+    0xf3f81dc7u, 0x70f81ce3u, 0x787c1ce3u, 0x3e1f7ce3u,
+    0x3f87fce7u, 0x3fe7dce7u, 0x39ff1cefu, 0x38fc3cfeu,
+    0x38387cfcu, 0x1c01f9f8u, 0x1e07e1e0u, 0x0fff83c0u,
+    0x07fe0780u, 0x01ff1f80u, 0x000fff00u, 0x0003fc00u,
+};
+
+static void draw_icon_mask(int x, int y, const uint32_t *mask, uint16_t color)
+{
+    for (int row = 0; row < 32; row++) {
+        for (int col = 0; col < 32; col++) {
+            if (mask[row] & (1u << (31 - col))) {
+                lcd_draw_rect(x + col, y + row, 1, 1, color);
+            }
+        }
+    }
+}
+
 static uint16_t pct_color(int pct)
 {
     if (pct < 0) return rgb565(90, 96, 110);
@@ -182,35 +251,72 @@ static void draw_bar(int x, int y, int w, int h, int pct, uint16_t color)
     lcd_draw_rect(x + 2, y + 2, (w - 4) * clamped / 100, h - 4, color);
 }
 
-static void draw_source(int y, const char *name, const source_status_t *source)
+static void draw_icon_claude(int cx, int cy, int frame)
+{
+    uint16_t bg = rgb565(12, 15, 22);
+    (void)frame;
+    lcd_draw_rect(cx - 17, cy - 17, 34, 34, bg);
+    draw_icon_mask(cx - 16, cy - 16, ICON_CLAUDE, rgb565(217, 119, 87));
+}
+
+static void draw_icon_codex(int cx, int cy, int frame)
+{
+    uint16_t bg = rgb565(12, 15, 22);
+    (void)frame;
+    lcd_draw_rect(cx - 17, cy - 17, 34, 34, bg);
+    draw_icon_mask(cx - 16, cy - 16, ICON_OPENAI, rgb565(85, 210, 255));
+}
+
+static void draw_activity(int frame)
+{
+    int x = 146 + (frame % 18) * 5;
+    uint16_t bg = rgb565(12, 15, 22);
+    uint16_t muted = rgb565(120, 130, 145);
+    uint16_t active = rgb565(85, 210, 255);
+
+    lcd_draw_rect(142, 214, 102, 14, bg);
+    for (int i = 0; i < 18; i++) {
+        lcd_draw_rect(146 + i * 5, 220, 2, 2, muted);
+    }
+    lcd_draw_rect(x, 218, 8, 6, active);
+}
+
+static void draw_source(int y, const char *name, const source_status_t *source, bool is_codex, int frame)
 {
     char label[32];
     uint16_t white = rgb565(238, 242, 247);
     uint16_t muted = rgb565(145, 154, 170);
     uint16_t color = strcmp(source->status, "ok") == 0 ? pct_color(source->current_pct) : rgb565(235, 80, 90);
 
-    draw_text(14, y, name, white, 2);
+    if (is_codex) {
+        draw_icon_codex(27, y + 14, frame);
+    } else {
+        draw_icon_claude(27, y + 14, frame);
+    }
+    draw_text(50, y, name, white, 2);
     snprintf(label, sizeof(label), "%d%%", source->current_pct);
     draw_text(178, y, label, color, 2);
-    draw_bar(14, y + 22, 212, 14, source->current_pct, color);
+    draw_bar(50, y + 22, 176, 14, source->current_pct, color);
 
     snprintf(label, sizeof(label), "WEEK %d%%", source->weekly_pct);
-    draw_text(14, y + 42, label, muted, 1);
-    draw_bar(92, y + 42, 84, 8, source->weekly_pct, pct_color(source->weekly_pct));
+    draw_text(50, y + 42, label, muted, 1);
+    draw_bar(128, y + 42, 58, 8, source->weekly_pct, pct_color(source->weekly_pct));
 
     if (strcmp(source->status, "ok") != 0) {
-        draw_text(181, y + 42, source->status, rgb565(235, 80, 90), 1);
+        draw_text(190, y + 42, source->status, rgb565(235, 80, 90), 1);
     }
 }
 
-static void draw_status_screen(const usage_status_t *status)
+static void draw_status_screen(const usage_status_t *status, int frame)
 {
     lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(12, 15, 22));
     draw_text(14, 12, "VIBECODE", rgb565(85, 210, 255), 2);
     draw_text(14, 34, status->ok ? "LIVE" : status->message, status->ok ? rgb565(80, 220, 150) : rgb565(240, 90, 90), 1);
-    draw_source(58, "CLAUDE", &status->claude);
-    draw_source(132, "CODEX", &status->codex);
+    draw_source(58, "CLAUDE", &status->claude, false, frame);
+    draw_source(132, "CODEX", &status->codex, true, frame);
     draw_text(14, 216, "BTN REFRESH", rgb565(120, 130, 145), 1);
+    draw_activity(frame);
+    lcd_flush();
 }
 
 static void draw_message(const char *line1, const char *line2)
@@ -218,6 +324,7 @@ static void draw_message(const char *line1, const char *line2)
     lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(12, 15, 22));
     draw_text(20, 82, line1, rgb565(238, 242, 247), 2);
     draw_text(20, 112, line2, rgb565(145, 154, 170), 1);
+    lcd_flush();
 }
 
 static void set_backlight(int level)
@@ -291,6 +398,15 @@ static void init_display(void)
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, true, false));
     ESP_ERROR_CHECK(esp_lcd_panel_set_gap(s_panel, LCD_OFFSET_X, LCD_OFFSET_Y));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
+    s_framebuffer = heap_caps_malloc(LCD_WIDTH * LCD_HEIGHT * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_flush_buffer = heap_caps_malloc(LCD_WIDTH * 20 * sizeof(uint16_t), MALLOC_CAP_DMA);
+    if (!s_framebuffer || !s_flush_buffer) {
+        ESP_LOGW(TAG, "framebuffer allocation failed, falling back to direct draws");
+        free(s_framebuffer);
+        free(s_flush_buffer);
+        s_framebuffer = NULL;
+        s_flush_buffer = NULL;
+    }
     draw_message("BOOTING", "display ok");
     set_backlight(1);
     ESP_LOGI(TAG, "display initialized");
@@ -463,14 +579,20 @@ void app_main(void)
         if (!got) {
             status.ok = false;
         }
-        draw_status_screen(&status);
+        int frame = 0;
+        draw_status_screen(&status, frame);
 
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 240; i++) {
             if (gpio_get_level(PIN_BUTTON) == 0) {
                 vTaskDelay(pdMS_TO_TICKS(250));
                 break;
             }
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            frame++;
+            draw_icon_claude(27, 72, frame);
+            draw_icon_codex(27, 146, frame);
+            draw_activity(frame);
+            lcd_flush();
+            vTaskDelay(pdMS_TO_TICKS(250));
         }
     }
 }
