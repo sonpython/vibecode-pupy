@@ -1,40 +1,70 @@
 # vibecode-pupy
 
-Workspace for the ESP32 Xiaozhi Claude/Codex usage monitor.
+ESP32-S3 desk gadget that shows Claude Code and Codex usage on a small Xiaozhi-style robot display.
 
-## Current System
+## Architecture
 
+```text
+Claude collector + session keeper ─┐
+                                   ├─> Usage API ── HTTPS ──> ESP32 firmware
+Codex collector + session keeper  ─┘
 ```
-Claude collector on Mac ─┐
-                         ├─> Usage API (FastAPI + SQLite) ──> ESP32 /status
-Codex collector in Docker ┘
+
+- Public dashboard/API: `https://vibecode.sonpython.com/`
+- API service: FastAPI + SQLite in `usage-api/`
+- Firmware: ESP-IDF + LVGL in `firmware/usage-monitor/`
+- Agent handoff: `AGENTS.md`, `docs/codex-memory.md`, `docs/session-sync.md`
+
+## Firmware
+
+Hardware target:
+
+- ESP32-S3, 16 MB flash, 8 MB PSRAM
+- USB serial/JTAG port: `/dev/cu.usbmodem83101`
+- Display lineage: `xingzhi-cube-1.54tft-wifi`
+- LCD pins: SCLK `GPIO9`, MOSI `GPIO10`, CS `GPIO14`, DC `GPIO8`, reset `GPIO18`, backlight `GPIO13`
+- Power config: hold `GPIO21`, charge detect `GPIO38`, battery ADC `ADC_UNIT_2` / `ADC_CHANNEL_6`
+
+Build and flash:
+
+```bash
+cd firmware/usage-monitor
+source ~/esp/esp-idf-v5.5/export.sh
+idf.py build
+idf.py -p /dev/cu.usbmodem83101 flash monitor
 ```
 
-The active implementation plan is in `plans/260517-1045-esp32-usage-monitor/`.
-Agent handoff starts from `AGENTS.md`, `docs/codex-memory.md`, and
-`docs/session-sync.md`.
+Controls:
 
-## Local API
+- Top button `GPIO0`: manual fetch. It keeps the current screen and only changes the bottom status to `FETCHING`.
+- Reset/load button `GPIO39` or `GPIO40`: short press toggles display on/off.
+- Reset/load button long press 5 seconds: starts Wi-Fi reset SoftAP `VIBECODE-PUPY-SETUP`.
 
-Create local secrets:
+## Usage API
+
+Create local env:
 
 ```bash
 cp usage-api/.env.example usage-api/.env
 $EDITOR usage-api/.env
 ```
 
-Run:
+Run locally:
 
 ```bash
-docker compose -f usage-api/docker-compose.yml up -d --build usage-api
+docker compose -f usage-api/docker-compose.yml up -d --build
 curl http://127.0.0.1:8080/healthz
 curl -H "X-Device-Secret: $DEVICE_SECRET" http://127.0.0.1:8080/status
 ```
 
-## Claude Collector
+Deploy target used during development:
 
-The Claude collector calls the authenticated claude.ai usage endpoint,
-normalizes it, and posts to `/collect/claude`.
+- Docker host: `192.168.1.120`
+- Public route: Cloudflare Tunnel to `vibecode.sonpython.com`
+
+## Collectors
+
+Claude auth is generated from a browser cURL copied from `https://claude.ai/settings/usage`:
 
 ```bash
 mkdir -p secrets
@@ -43,81 +73,41 @@ chmod 600 secrets/claude_auth.json
 docker compose -f usage-api/docker-compose.yml up -d --build claude-collector claude-session-keeper
 ```
 
-Copy the cURL from `https://claude.ai/settings/usage` for
-`/api/organizations/.../usage`. The auth file is local-only and must not be
-committed.
-
-## Codex Collector
-
-Create auth bundle from a browser cURL request:
+Codex auth is generated from a browser cURL for the ChatGPT/Codex usage endpoint:
 
 ```bash
 mkdir -p secrets
 pbpaste | python3 collectors/codex/parse_curl.py > secrets/codex_auth.json
 chmod 600 secrets/codex_auth.json
+docker compose -f usage-api/docker-compose.yml up -d --build codex-collector codex-session-keeper
 ```
 
-Run collector:
+## Tests
 
 ```bash
-docker compose -f usage-api/docker-compose.yml up -d --build codex-collector
-docker compose -f usage-api/docker-compose.yml logs --tail=50 codex-collector
+pytest -q usage-api/tests collectors/claude collectors/codex
 ```
 
-If auth expires, `/status` shows `codex.status = "auth_expired"`.
-
-## Cloudflare Tunnel
-
-Use token mode for MVP:
-
-```yaml
-cloudflared:
-  image: cloudflare/cloudflared:latest
-  restart: unless-stopped
-  command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
-  depends_on:
-    - usage-api
-```
-
-Keep `CF_TUNNEL_TOKEN` in `usage-api/.env`. Do not commit tunnel credential JSON.
-
-## Smoke Test
-
-Manual:
+Firmware verification is manual hardware validation:
 
 ```bash
-USAGE_STATUS_URL=http://127.0.0.1:8080/status \
-DEVICE_SECRET=... \
-bash ops/daily_smoke_test.sh
+cd firmware/usage-monitor
+source ~/esp/esp-idf-v5.5/export.sh
+idf.py build
+idf.py -p /dev/cu.usbmodem83101 flash monitor
 ```
 
-Install launchd:
-
-```bash
-bash ops/install_smoke_test.sh
-```
-
-## Firmware Notes
-
-Hardware already probed:
-
-- ESP32-S3 QFN56 rev v0.2
-- 16 MB flash, 8 MB PSRAM
-- Native USB serial/JTAG
-- MAC `a0:f2:62:e8:a4:40`
-- Port `/dev/cu.usbmodem83101`
-
-ESP-IDF v5.5 is installed at `~/esp/esp-idf-v5.5`.
-Upstream firmware clone is at `~/projects/xiaozhi-esp32-fork`.
+Expected boot logs include Wi-Fi connection, HTTP 200 from `/status`, and battery readings around `battery_raw=2450`, `battery_pct=100` when full/charging.
 
 ## Security
 
 Never commit:
 
 - `usage-api/.env`
-- `secrets/codex_auth.json`
-- `secrets/claude_auth.json`
-- Cloudflare tunnel credentials
-- ESP32 flash backups
+- `secrets/*.json`
+- Cloudflare tunnel tokens or credential JSON
 - ChatGPT cookies/JWTs
 - Claude cookies/session keys
+- ESP32 flash backups
+
+All credentials should stay in ignored local files or host environment variables.
