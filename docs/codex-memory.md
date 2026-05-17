@@ -117,7 +117,6 @@ Field `Actor` PHẢI chọn 1 trong:
 
 ### 🚨 Follow-ups
 - [ ] Visual confirmation still needs the human looking at the physical screen. If it is lit but wrong/blank, first swap LCD `DC`/`RST` between `GPIO8` and `GPIO18`; all other display pins are now evidence-based.
-- [ ] After confirmed visually, commit and push the firmware pin-map change.
 
 ### ⚠ Blockers / open questions
 - Codex cannot directly see the physical LCD, so visual success must be confirmed by user.
