@@ -86,6 +86,38 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 12:32 SGT — public-domain-and-production-token-rotation
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User confirmed Cloudflare hostname `https://vibecode.sonpython.com/`
+
+### ✅ Done
+- Verified public Cloudflare route:
+  - `GET https://vibecode.sonpython.com/healthz` -> HTTP 200
+  - `GET https://vibecode.sonpython.com/status` with the current device secret -> HTTP 200
+- Rotated local API secrets from dev values to random production-style values in ignored `usage-api/.env`.
+- Recreated Docker services with the new secrets: `usage-api`, `codex-collector`, `cloudflared`.
+- Refreshed Claude collector once using the new local collector token.
+- Verified old dev `X-Device-Secret: dev-device-secret` now returns HTTP 401.
+- Verified current public status reports `claude.status=ok` and `codex.status=ok`.
+
+### 📁 Files changed
+- `usage-api/.env` — LOCAL IGNORED, production-style random tokens set
+- `docs/codex-memory.md` — UPDATED, prepended this entry
+
+### 🔑 Key decisions
+- Keep the production device secret out of chat and git; firmware generation should read it from local ignored config.
+- Use `https://vibecode.sonpython.com/status` as the ESP32 production API endpoint.
+
+### 📊 State changes (active projects)
+- Public usage API: domain unverified -> live via Cloudflare.
+- API auth: dev token accepted -> dev token rejected, production local secret required.
+
+### 🚨 Follow-ups
+- [ ] Firmware Phase 05/06 needs WiFi credentials for the ESP32 or an onboard provisioning flow before it can fetch the public API autonomously.
+- [ ] Rotate Cloudflare tunnel token and ChatGPT/Codex browser auth later because both were pasted into chat.
+
 ## 2026-05-17 12:25 SGT — cloudflare-tunnel-and-codex-auth-live
 
 **Actor**: codex-cli
