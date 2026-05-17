@@ -154,11 +154,11 @@ static void set_label(lv_obj_t *obj, const char *fmt, ...)
 static void style_bar(lv_obj_t *bar, lv_color_t color)
 {
     lv_obj_remove_style_all(bar);
-    lv_obj_set_size(bar, 142, 10);
-    lv_obj_set_style_radius(bar, 5, LV_PART_MAIN);
+    lv_obj_set_size(bar, 146, 14);
+    lv_obj_set_style_radius(bar, 7, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, lv_color_hex(0x232935), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar, 5, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bar, 7, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
 }
@@ -219,20 +219,20 @@ static void create_source_row(
     lv_obj_set_pos(name_label, 56, y);
 
     widgets->current_pct = lv_label_create(screen);
-    style_label(widgets->current_pct, lv_color_hex(0x55d2ff), &lv_font_montserrat_20);
-    lv_obj_set_width(widgets->current_pct, 76);
-    lv_obj_set_style_text_align(widgets->current_pct, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(widgets->current_pct, 56, y + 20);
+    style_label(widgets->current_pct, lv_color_hex(0x55d2ff), &lv_font_montserrat_18);
+    lv_obj_set_width(widgets->current_pct, 58);
+    lv_obj_set_style_text_align(widgets->current_pct, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(widgets->current_pct, 144, y - 2);
 
     widgets->current_bar = lv_bar_create(screen);
     style_bar(widgets->current_bar, lv_color_hex(0x55d2ff));
-    lv_obj_set_pos(widgets->current_bar, 56, y + 45);
+    lv_obj_set_pos(widgets->current_bar, 56, y + 28);
 
     widgets->reset_text = lv_label_create(screen);
     lv_label_set_text(widgets->reset_text, "RESET --");
     style_label(widgets->reset_text, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
-    lv_obj_set_width(widgets->reset_text, 142);
-    lv_obj_set_pos(widgets->reset_text, 56, y + 58);
+    lv_obj_set_width(widgets->reset_text, 146);
+    lv_obj_set_pos(widgets->reset_text, 56, y + 48);
 
     widgets->weekly_bar = lv_arc_create(screen);
     style_week_arc(widgets->weekly_bar, lv_color_hex(0x55d2ff));

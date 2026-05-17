@@ -1,0 +1,10 @@
+FROM mcr.microsoft.com/playwright/python:v1.56.0-noble
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+RUN pip install --no-cache-dir httpx==0.28.1 playwright==1.56.0
+COPY session_keeper.py ./
+
+CMD ["python", "session_keeper.py"]

@@ -23,6 +23,17 @@ services:
     depends_on:
       - usage-api
 
+  codex-session-keeper:
+    build:
+      context: ../collectors/codex
+      dockerfile: Dockerfile.playwright
+    restart: unless-stopped
+    environment:
+      CODEX_AUTH_FILE: /secrets/codex_auth.json
+      KEEPALIVE_INTERVAL_SEC: ${CODEX_KEEPALIVE_INTERVAL_SEC:-900}
+    volumes:
+      - ../secrets:/secrets:ro
+
   claude-collector:
     build:
       context: ../collectors/claude

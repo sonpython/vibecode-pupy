@@ -86,6 +86,33 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 14:51 SGT — docker-host-deploy-and-codex-playwright-keeper
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked whether deployment was actually on Docker host `192.168.1.120`, then reminded to add Playwright to keep the Codex session alive.
+
+### ✅ Done
+- Confirmed previous live stack was still local Docker, not the `192.168.1.120` host.
+- Connected to `root@192.168.1.120`, copied the project runtime into `/opt/vibecode-pupy`, and deployed the usage stack there.
+- Started host services: `usage-api`, `codex-collector`, `claude-collector`, `cloudflared`, and new `codex-session-keeper`.
+- Copied Claude usage project data to `/root/.claude/projects` on the host so host `claude-collector` can post fresh snapshots.
+- Stopped the local Docker Compose stack so `vibecode.sonpython.com` is served from the Docker host tunnel.
+- Added a Playwright-based Codex session keeper that imports cookies/headers from `secrets/codex_auth.json`, opens Codex analytics, and calls `wham/usage` every 15 minutes.
+- Verified on host: Playwright keepalive logs `page_status=200 usage_status=200`; public API reports Claude/Codex `ok`.
+- Tweaked firmware UI: current usage percent now sits on the same row as the model name, aligned near the end of the current usage bar; current bar height increased from 10px to 14px and firmware was flashed.
+
+### 📁 Files changed
+- `collectors/codex/Dockerfile.playwright` — NEW, Playwright session keeper image.
+- `collectors/codex/session_keeper.py` — NEW, Codex browser/API keepalive loop.
+- `usage-api/docker-compose.yml` — UPDATED, added `codex-session-keeper` service.
+- `firmware/usage-monitor/main/main.c` — UPDATED, current percent positioning and thicker current usage bar.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+### 🔑 Key decisions
+- Keep direct `codex-collector` as the data source and add Playwright as a session warmer instead of replacing the collector with browser scraping.
+- Use the existing Cloudflare tunnel token on the Docker host and stop local tunnel connectors to avoid split serving.
+
 ## 2026-05-17 14:42 SGT — pupy-screen-redesign
 
 **Actor**: codex-cli
