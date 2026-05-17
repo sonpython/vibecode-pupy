@@ -30,3 +30,16 @@ def test_parse_curl():
     assert parsed["bearer"] == "abc.def"
     assert parsed["cookies"]["cf_clearance"] == "clear"
     assert parsed["headers"]["user-agent"] == "Test UA"
+
+
+def test_parse_curl_cookie_flag():
+    parsed = parse_curl(
+        "curl 'https://chatgpt.com/backend-api/wham/usage' "
+        "-H 'Authorization: Bearer abc.def' "
+        "-b 'cf_clearance=clear; _puid=puid' "
+        "-H 'User-Agent: Test UA'"
+    )
+
+    assert parsed["bearer"] == "abc.def"
+    assert parsed["cookies"]["_puid"] == "puid"
+    assert parsed["headers"]["user-agent"] == "Test UA"

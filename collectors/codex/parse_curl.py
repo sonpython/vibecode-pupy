@@ -40,6 +40,12 @@ def parse_curl(command: str) -> dict[str, object]:
                     headers[key_l] = value
             i += 2
             continue
+        if parts[i] in ("-b", "--cookie", "--cookie-jar") and i + 1 < len(parts):
+            jar = SimpleCookie()
+            jar.load(parts[i + 1])
+            cookies.update({name: morsel.value for name, morsel in jar.items()})
+            i += 2
+            continue
         i += 1
 
     if not bearer:

@@ -86,6 +86,38 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 12:25 SGT — cloudflare-tunnel-and-codex-auth-live
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User provided Cloudflare tunnel token and ChatGPT/Codex `wham/usage` cURL auth material
+
+### ✅ Done
+- Saved Cloudflare tunnel token into ignored local `usage-api/.env` and started `cloudflared` with Docker Compose profile `tunnel`.
+- Verified tunnel container registered successfully with Cloudflare for tunnel ID `95c8a269-fcf8-4459-97ec-6d0b5e392571`.
+- Updated Codex cURL parser to support Chrome's `curl -b '<cookie jar>'` form in addition to `-H 'Cookie: ...'`.
+- Parsed current browser auth from clipboard into ignored local `secrets/codex_auth.json`, restarted `codex-collector`, and verified `/status` now reports `codex.status=ok`.
+- Ran focused tests: `pytest -q collectors/codex/test_codex_collector.py` -> `3 passed`.
+
+### 📁 Files changed
+- `collectors/codex/parse_curl.py` — UPDATED, support `-b/--cookie` cURL cookie input
+- `collectors/codex/test_codex_collector.py` — UPDATED, regression test for `-b` parser path
+- `usage-api/.env` — LOCAL IGNORED, tunnel token configured
+- `secrets/codex_auth.json` — LOCAL IGNORED, current Codex browser auth configured
+- `docs/codex-memory.md` — UPDATED, prepended this entry
+
+### 🔑 Key decisions
+- Do not commit any Cloudflare token, bearer token, session cookie, or auth JSON.
+- Keep the collector running locally now that the real auth is valid.
+
+### 📊 State changes (active projects)
+- Codex collector: `auth_expired` -> `ok`.
+- Cloudflare tunnel: scaffolded -> running locally.
+
+### 🚨 Follow-ups
+- [ ] Rotate Cloudflare tunnel token and ChatGPT/Codex browser session later because both were pasted into chat.
+- [ ] Replace dev `DEVICE_SECRET` and collector bearer tokens with production random values before wiring ESP32/public endpoint.
+
 ## 2026-05-17 12:15 SGT — usage-monitor-local-stack-and-board-baseline
 
 **Actor**: codex-cli
