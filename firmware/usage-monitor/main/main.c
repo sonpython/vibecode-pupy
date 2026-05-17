@@ -121,10 +121,19 @@ typedef struct {
     int cap;
 } http_buffer_t;
 
+typedef enum {
+    BUTTON_ACTION_NONE = 0,
+    BUTTON_ACTION_FETCH,
+    BUTTON_ACTION_TOGGLE_DISPLAY,
+    BUTTON_ACTION_WIFI_RESET_AP,
+} button_action_t;
+
 typedef struct {
     gpio_num_t pin;
     const char *name;
     int active_level;
+    button_action_t short_action;
+    button_action_t long_action;
     int last_level;
     TickType_t pressed_tick;
     bool long_sent;
@@ -132,15 +141,10 @@ typedef struct {
 } button_watch_t;
 
 static button_watch_t s_buttons[] = {
-    {GPIO_NUM_39, "reset-load-gpio39", 0, -1, 0, false, 0},
-    {GPIO_NUM_40, "reset-load-gpio40", 0, -1, 0, false, 0},
+    {GPIO_NUM_0, "top-fetch-gpio0", 0, BUTTON_ACTION_FETCH, BUTTON_ACTION_NONE, -1, 0, false, 0},
+    {GPIO_NUM_39, "reset-load-gpio39", 0, BUTTON_ACTION_TOGGLE_DISPLAY, BUTTON_ACTION_WIFI_RESET_AP, -1, 0, false, 0},
+    {GPIO_NUM_40, "reset-load-gpio40", 0, BUTTON_ACTION_TOGGLE_DISPLAY, BUTTON_ACTION_WIFI_RESET_AP, -1, 0, false, 0},
 };
-
-typedef enum {
-    BUTTON_ACTION_NONE = 0,
-    BUTTON_ACTION_SHORT_PRESS,
-    BUTTON_ACTION_LONG_PRESS,
-} button_action_t;
 
 static lv_color_t pct_color(int pct)
 {
@@ -859,7 +863,7 @@ static button_action_t poll_button_action(void)
             s_buttons[i].long_sent = true;
             s_buttons[i].last_trigger_tick = now;
             ESP_LOGW(TAG, "long press button=%s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
-            return BUTTON_ACTION_LONG_PRESS;
+            return s_buttons[i].long_action;
         }
 
         if (level == s_buttons[i].last_level) {
@@ -894,23 +898,33 @@ static button_action_t poll_button_action(void)
         }
         s_buttons[i].last_trigger_tick = now;
         ESP_LOGI(TAG, "short press button=%s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
-        return BUTTON_ACTION_SHORT_PRESS;
+        return s_buttons[i].short_action;
     }
     return BUTTON_ACTION_NONE;
 }
 
 static bool handle_button_action(button_action_t action)
 {
-    if (action == BUTTON_ACTION_LONG_PRESS) {
+    if (action == BUTTON_ACTION_WIFI_RESET_AP) {
         start_wifi_reset_ap();
         return true;
     }
-    if (action == BUTTON_ACTION_SHORT_PRESS) {
+    if (action == BUTTON_ACTION_TOGGLE_DISPLAY) {
         set_display_enabled(!s_display_enabled);
         if (s_display_enabled && !s_wifi_ap_mode) {
             ui_show_message("FETCH", "manual");
         }
         return true;
+    }
+    if (action == BUTTON_ACTION_FETCH) {
+        if (!s_display_enabled) {
+            set_display_enabled(true);
+        }
+        if (!s_wifi_ap_mode) {
+            ui_show_message("FETCH", "manual");
+            ESP_LOGI(TAG, "manual fetch requested");
+            return true;
+        }
     }
     return false;
 }

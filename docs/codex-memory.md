@@ -86,6 +86,30 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:24 SGT — firmware-restore-top-fetch-button
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported the top button no longer fetched data after reset/load button changes.
+
+**What changed**
+- Restored `GPIO0` as a dedicated top fetch button.
+- Split button actions by button role:
+  - `GPIO0` short press = manual fetch only.
+  - `GPIO39`/`GPIO40` short press = display on/off toggle.
+  - `GPIO39`/`GPIO40` long press 5s = Wi-Fi reset SoftAP.
+- Kept the top button out of display toggle and Wi-Fi AP reset behavior.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, `top-fetch-gpio0 gpio=0 active=0 initial=1`, Wi-Fi connected, HTTP 200, and `power battery_raw=2460 battery_pct=100 charge_gpio=0 charging=1`.
+- Serial monitor also captured a top-button press: `button down top-fetch-gpio0`, `short press button=top-fetch-gpio0`, `manual fetch requested`, followed by another TLS/API fetch.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, per-button action mapping and top fetch restore.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
 ## 2026-05-17 16:18 SGT — firmware-reset-load-button-actions
 
 **Actor**: codex-cli
