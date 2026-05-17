@@ -86,6 +86,24 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 15:59 SGT — firmware-claude-icon-byte-order-fix
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported the Claude icon still rendered blue/green on the physical display instead of orange.
+
+**What changed**
+- Swapped red/blue bytes in `brand_icon_claude_map` only. LVGL/image rendering on this target reads the icon data as B,G,R,A, while the previous generated asset stored R,G,B,A.
+- Kept the Codex/OpenAI icon unchanged because white pixels are unaffected by RGB/BGR ordering.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:52:48`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and continued reporting power state.
+
+**Files changed**
+- `firmware/usage-monitor/main/brand_icons.c` — UPDATED, Claude icon color byte order.
+
 ## 2026-05-17 15:54 SGT — firmware-brand-icon-color-fix
 
 **Actor**: codex-cli
