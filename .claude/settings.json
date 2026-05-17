@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "skillListingBudgetFraction": 0.03,
+  "skillListingMaxDescChars": 512,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash .claude/hooks/node-hook-runner.sh .claude/statusline.cjs",
+    "padding": 0
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/node-hook-runner.sh .claude/hooks/simplify-gate.cjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/node-hook-runner.sh .claude/hooks/descriptive-name.cjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Glob|Grep|Read|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/node-hook-runner.sh .claude/hooks/scout-block.cjs"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/node-hook-runner.sh .claude/hooks/privacy-block.cjs"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/task-completed-handler.cjs\""
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/teammate-idle-handler.cjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,191 @@
+# Codex Memory Log
+
+> **Purpose**: Append-only timeline of work done by any AI agent. When user returns to a different agent, that agent reads this file to catchup.
+> **Format**: Latest entry on TOP. Each entry = 1 session/task. Atomic, self-contained.
+> **Rule**: KHÔNG sửa entry cũ. Chỉ prepend entry mới ở phần "Entries" bên dưới.
+> **Git**: file này committed + pushed. Sync giữa các môi trường (local / remote / cloud agents).
+
+---
+
+## Actor namespace (SOT)
+
+Field `Actor` PHẢI chọn 1 trong:
+
+| Actor tag | Use case |
+|---|---|
+| `claude-code-{model}` | Claude Code (vd `claude-code-opus-4.7`) |
+| `codex-cli` | Codex CLI |
+| `codex-web` | ChatGPT codex.openai.com |
+| `opencode` | OpenCode CLI |
+| `chatgpt-web` | ChatGPT thường |
+| `routine-claude` | claude.ai routines |
+| `routine-codex` | Codex routine |
+| `cron-{tool}` | OS cron |
+| `agent-{name}` | Subagent spawn |
+| `webhook-{source}` | External trigger |
+
+---
+
+## Entry format
+
+### Full template (session work với decision/state change)
+
+```markdown
+## YYYY-MM-DD HH:mm SGT — <slug-mô-tả-ngắn>
+
+**Actor**: <từ namespace trên>
+**Branch**: <git-branch>
+**Trigger**: <user request hoặc context>
+
+### ✅ Done
+- <action 1 + outcome>
+
+### 📁 Files changed
+- `path/to/file1.ext` — <NEW | UPDATED | DELETED — note>
+
+### 🔑 Key decisions
+- <decision + rationale, hoặc xoá nếu không có>
+
+### 📊 State changes (active projects)
+- <Project X: before → after, hoặc xoá nếu không có>
+
+### 🚨 Follow-ups (cho session sau)
+- [ ] <task, owner, deadline>
+
+### ⚠ Blockers / open questions
+- <issue, hoặc xoá nếu không có>
+
+### 💡 Lessons learned
+- <note, hoặc xoá nếu không có>
+```
+
+### Brief template (recurring jobs / routine / cron)
+
+```markdown
+## YYYY-MM-DD HH:mm SGT — <slug> [routine]
+**Actor**: routine-claude | **Trigger**: <cron ID>
+**Outcome**: ✓/⚠/✗ <1-line result>
+**Files**: <changed files hoặc "none">
+**Next**: <next run date hoặc "—">
+```
+
+---
+
+## Anti-patterns
+
+- ❌ Edit entry cũ — chỉ prepend mới
+- ❌ Log secrets/credentials/PII
+- ❌ Quên `git push`
+- ❌ Tạo memory atomic files trong `docs/` (Claude-private go in `~/.claude/projects/*/memory/`)
+
+---
+
+## Entries
+
+> **NEWEST ON TOP**. Prepend, never append at bottom.
+
+<!-- ENTRY MARKER — agents prepend here -->
+
+## 2026-05-17 11:50 SGT — git-init-and-origin-setup
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to create git repo, then provided remote `https://github.com/sonpython/vibecode-pupy`
+
+### ✅ Done
+- Initialized local git repository in `/Users/michaelphan/projects/vibecode-pupy` with default branch `main`.
+- Added remote `origin` pointing to `https://github.com/sonpython/vibecode-pupy`.
+- Checked remote heads with `git ls-remote --heads origin`; remote currently has no branch heads, so initial push to `main` is safe.
+- Updated `.gitignore` so important project context (`.claude/`, `plans/`, docs, handoff files) can be tracked while runtime logs, session state, and virtualenv remain ignored.
+
+### 📁 Files changed
+- `.gitignore` — UPDATED, track project ClaudeKit/plans while ignoring local runtime/generated state
+- `docs/codex-memory.md` — UPDATED, prepended this session entry
+
+### 🔑 Key decisions
+- Use `main` as initial branch.
+- Track `.claude/` and `plans/` because this workspace's handoff, rules, skills, and active implementation plan are the source of truth for future agents.
+
+### 🚨 Follow-ups
+- [ ] Push initial commit to `origin/main`.
+
+## 2026-05-17 11:48 SGT — codex-ramp-up-and-claudekit-map
+
+**Actor**: codex-cli
+**Branch**: (no git yet — project not init'd)
+**Trigger**: User asked Codex to pull latest code, scout Claude/Codex handoff docs, add startup handoff rule, and map ClaudeKit assets for Codex use
+
+### ✅ Done
+- Checked git state: `/Users/michaelphan/projects/vibecode-pupy` is not a git repository, so `git pull` cannot run until the workspace is initialized or cloned with `.git`.
+- Read current handoff/context docs: `docs/codex-memory.md`, `docs/session-sync.md`, `docs/app-journey-story.md`, `docs/codex-memory-protocol.md`, `docs/codex-starter-prompt.md`, `CLAUDE.md`, and active plan `plans/260517-1045-esp32-usage-monitor/plan.md`.
+- Synced ClaudeKit assets from project `.claude/` into Codex global directories: skills to `~/.codex/skills/`, agents/scripts/config to `~/.codex/claudekit/`, rules to `~/.codex/rules/claudekit/`, and plan templates to `~/.codex/templates/claudekit/plans/`.
+- Added root `AGENTS.md` with mandatory startup handoff protocol for Codex: check git/pull if possible, read memory/session/app-story/active-plan/rules, confirm state, and log state-changing sessions.
+
+### 📁 Files changed
+- `AGENTS.md` — NEW, Codex startup rules + ClaudeKit mapping notes
+- `docs/codex-memory.md` — UPDATED, prepended this session entry
+- `~/.codex/skills/*` — UPDATED/NEW, synced project ClaudeKit skills except `.venv`
+- `~/.codex/claudekit/*` — UPDATED, synced agents/scripts/config
+- `~/.codex/rules/claudekit/*` — UPDATED, synced ClaudeKit project rules
+- `~/.codex/templates/claudekit/plans/*` — UPDATED, synced plan templates
+
+### 🔑 Key decisions
+- Did not copy `.claude/skills/.venv` into Codex because virtual environments are machine-specific generated state; Codex can use scripts and reinstall dependencies when needed.
+- Kept project `.claude/` as the workspace source of truth; global `~/.codex/` copies are compatibility mapping for Codex.
+
+### 📊 State changes (active projects)
+- Codex handoff support: missing root `AGENTS.md` → enabled
+- ClaudeKit-to-Codex mapping: partial existing global copy → refreshed from this workspace
+
+### 🚨 Follow-ups
+- [ ] Decide whether to `git init` this workspace or clone the real remote repo into this path so memory-bridge can pull/commit/push.
+- [ ] If this project has an intended remote, add `origin` and run first commit/push for `AGENTS.md` + memory files.
+
+### ⚠ Blockers / open questions
+- No `.git` directory exists in the workspace, so latest remote code cannot be pulled from here.
+
+## 2026-05-17 11:40 SGT — esp32-xiaozhi-usage-monitor-brainstorm-plan
+
+**Actor**: claude-code-opus-4.7
+**Branch**: (no git yet — project not init'd)
+**Trigger**: User invoked `/brainstorm` to convert existing Xiaozhi ESP32 alarm-clock robot into single-purpose desk gadget showing Claude/Codex usage percentages (5h block + weekly limits) on power-button press
+
+### ✅ Done
+- Live USB probe → confirmed hardware: ESP32-S3 N16R8 (16MB flash + 8MB PSRAM, native USB-JTAG, MAC `a0:f2:62:e8:a4:40`), currently running `xiaozhi-esp32` v2.0.8 (github.com/78/xiaozhi-esp32, ESP-IDF v5.5, Mar 7 2026 build). TTY: `/dev/cu.usbmodem83101`.
+- Discovered Codex Cloud has clean JSON API `GET https://chatgpt.com/backend-api/wham/usage` returning `rate_limit.primary_window.used_percent` + `secondary_window` + `reset_at` (unix ts). Auth: Bearer JWT (~10d TTL) + session cookies (`__Secure-next-auth.session-token`, `cf_clearance`, `_puid`). Replaces Playwright DOM scraping.
+- Wrote brainstorm summary at `plans/reports/brainstorm-260517-1045-esp32-usage-monitor.md` (15KB, 9 sections).
+- Created 8-phase implementation plan at `plans/260517-1045-esp32-usage-monitor/` (plan.md + phase-01..08 *.md, ~6.5d total effort).
+- Full flash backup at `~/esp-backups/xiaozhi-jqrnz-A0F262E8A440-2026-05-17-factory.bin` (16MiB, SHA256 `3a6a8a1f8a3a46be3993cd46ca3d0371c4003b953257995be0b2de789f6b583f`).
+- `esptool erase-flash` (17s) to silence the Chinese-speaking factory firmware.
+- `memory init` — set up `docs/` from skill templates (no git so no commit/push).
+
+### 📁 Files changed
+- `plans/reports/brainstorm-260517-1045-esp32-usage-monitor.md` — NEW
+- `plans/260517-1045-esp32-usage-monitor/plan.md` — NEW
+- `plans/260517-1045-esp32-usage-monitor/phase-{01..08}-*.md` — NEW (8 files)
+- `docs/session-sync.md` `docs/codex-memory.md` `docs/app-journey-story.md` `docs/codex-memory-protocol.md` `docs/codex-starter-prompt.md` — NEW (memory-bridge init from templates)
+
+### 🔑 Key decisions
+- **Firmware base**: fork `xiaozhi-esp32` v2.0.8 (strip audio/AI/cloud, keep WiFi+display+button+LVGL+wifi_provisioning). Not from-scratch ESP-IDF. Saves ~2d.
+- **Codex collector**: hit `/backend-api/wham/usage` directly (httpx + manual auth file), Docker container on 192.168.1.120, 5min poll, webhook on 401. Not Playwright. Saves ~2-3d vs scraping approach.
+- **Claude collector**: `ccusage` CLI parsing local `~/.claude/projects/*.jsonl` on Mac via launchd timer (no public Claude usage API for subscription plans exists).
+- **Exposure**: Cloudflare Tunnel HTTPS to `usage.<domain>` (real TLS cert, ESP32 verifies via ESP-IDF cert bundle).
+- **No OTA** — USB-C re-flash acceptable for personal device.
+
+### 📊 State changes (active projects)
+- esp32-usage-monitor: nonexistent → planned (Phase 01-08 ready)
+- Xiaozhi device hardware: running factory firmware → flash erased (silent, factory backup preserved)
+
+### 🚨 Follow-ups
+- [ ] Phase 01: identify exact xiaozhi-esp32 board variant matching this hardware (try `idf.py monitor` first; fallback open PCB silkscreen). Capture display controller + GPIO map + button GPIO + backlight pin.
+- [ ] Phase 01: install ESP-IDF v5.5 toolchain (`~/esp/esp-idf`).
+- [ ] Consider `git init` on `vibecode-pupy` — currently no git, so memory-bridge can't push cross-environment.
+- [ ] Phase 04: write Codex auth refresh runbook (cf_clearance is the fastest-rotating cookie).
+
+### ⚠ Blockers / open questions
+- Exact board variant name within `xiaozhi-esp32/main/boards/*` still unknown — Alibaba spec sheet (JQRNZ / Estella, "1024×768 AMOLED") is marketing fiction; real likely 240×280 IPS LCD. Resolved in Phase 01.
+
+### 💡 Lessons learned
+- Always probe ESP32 hardware live before trusting datasheets. Alibaba product specs frequently bullshit screen specs.
+- Vendor dashboards that look like they need scraping usually expose a clean JSON API under the hood — check Network tab before reaching for Playwright.
+- `ck plan create` doesn't exist in ck CLI v3.35.0 (only `agents`, `commands`, `config`, `skills`, etc.). The ck-plan skill template references it as if it does — fall back to manual file creation.
