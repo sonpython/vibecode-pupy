@@ -41,11 +41,24 @@ services:
     env_file: .env
     environment:
       USAGE_API_URL: http://usage-api:8080
+      CLAUDE_AUTH_FILE: /secrets/claude_auth.json
       POLL_INTERVAL_SEC: ${POLL_INTERVAL_SEC:-300}
+      AUTH_ALERT_WEBHOOK: ${AUTH_ALERT_WEBHOOK:-}
     volumes:
-      - ${HOME}/.claude:/root/.claude:ro
+      - ../secrets:/secrets:ro
     depends_on:
       - usage-api
+
+  claude-session-keeper:
+    build:
+      context: ../collectors/claude
+      dockerfile: Dockerfile.playwright
+    restart: unless-stopped
+    environment:
+      CLAUDE_AUTH_FILE: /secrets/claude_auth.json
+      KEEPALIVE_INTERVAL_SEC: ${CLAUDE_KEEPALIVE_INTERVAL_SEC:-900}
+    volumes:
+      - ../secrets:/secrets:ro
 
   cloudflared:
     image: cloudflare/cloudflared:latest

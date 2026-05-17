@@ -86,6 +86,44 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 15:39 SGT — claude-web-usage-api-collector
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User provided claude.ai `/api/organizations/.../usage` cURL and clarified Claude should mirror Codex: direct web API + Playwright session keeper.
+
+**What changed**
+- Replaced Claude `ccusage` collector with an authenticated Claude web usage API collector.
+- Added `collectors/claude/parse_claude_curl.py` to convert browser cURL from `https://claude.ai/settings/usage` into ignored `secrets/claude_auth.json`.
+- Added `claude-session-keeper` Playwright service to keep claude.ai session warm and smoke-test the usage endpoint.
+- Updated Docker Compose: `claude-collector` reads `/secrets/claude_auth.json`; no longer mounts `/root/.claude`.
+- Deployed to Docker host `192.168.1.120`.
+
+**Validation**
+- `pytest -q collectors/claude collectors/codex usage-api/tests` -> `10 passed`
+- Local Claude web usage fetch -> HTTP 200, current/weekly percentages parsed.
+- Host `claude-session-keeper` log -> `page_status=200 usage_status=200`
+- `https://vibecode.sonpython.com/public/status` -> Claude `ok`, current `3`, weekly `5` at deploy time.
+
+**Files changed**
+- `collectors/claude/claude_collector.py` — UPDATED, Claude web usage API collector.
+- `collectors/claude/parse_claude_curl.py` — NEW, auth parser for claude.ai usage cURL.
+- `collectors/claude/session_keeper.py` — NEW, Playwright session warmer.
+- `collectors/claude/Dockerfile` — UPDATED, pure Python image.
+- `collectors/claude/Dockerfile.playwright` — NEW, Playwright image.
+- `collectors/claude/test_claude_collector.py` — UPDATED, tests for web usage API payload + parser.
+- `usage-api/docker-compose.yml` — UPDATED, adds `claude-session-keeper` and secret-mounted Claude collector.
+- `README.md` — UPDATED, Claude auth refresh docs.
+
+**Decisions**
+- Use Claude's web app usage endpoint because it directly returns `five_hour.utilization` and `seven_day.utilization`.
+- Treat this as an internal web endpoint like Codex `/wham/usage`; if auth expires, collector posts `auth_expired`.
+- Keep `secrets/claude_auth.json` ignored and never commit claude.ai cookies/session keys.
+
+**Next**
+- If Claude shows `auth_expired`, refresh from browser: copy usage endpoint cURL and run `pbpaste | python3 collectors/claude/parse_claude_curl.py > secrets/claude_auth.json`, then redeploy/copy secret to host.
+- Consider adding a shared auth-refresh README for both Codex and Claude.
+
 ## 2026-05-17 14:51 SGT — docker-host-deploy-and-codex-playwright-keeper
 
 **Actor**: codex-cli

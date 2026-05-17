@@ -33,21 +33,19 @@ curl -H "X-Device-Secret: $DEVICE_SECRET" http://127.0.0.1:8080/status
 
 ## Claude Collector
 
-The Mac collector runs `npx -y ccusage@latest blocks --json`, normalizes it,
-and posts to `/collect/claude`.
+The Claude collector calls the authenticated claude.ai usage endpoint,
+normalizes it, and posts to `/collect/claude`.
 
 ```bash
-python3 -m pip install --user -r collectors/claude/requirements.txt
-USAGE_API_URL=http://127.0.0.1:8080 \
-CLAUDE_COLLECTOR_TOKEN=... \
-python3 collectors/claude/claude_collector.py
+mkdir -p secrets
+pbpaste | python3 collectors/claude/parse_claude_curl.py > secrets/claude_auth.json
+chmod 600 secrets/claude_auth.json
+docker compose -f usage-api/docker-compose.yml up -d --build claude-collector claude-session-keeper
 ```
 
-Install launchd after editing token values in the installed plist:
-
-```bash
-bash collectors/claude/install.sh
-```
+Copy the cURL from `https://claude.ai/settings/usage` for
+`/api/organizations/.../usage`. The auth file is local-only and must not be
+committed.
 
 ## Codex Collector
 
@@ -118,6 +116,8 @@ Never commit:
 
 - `usage-api/.env`
 - `secrets/codex_auth.json`
+- `secrets/claude_auth.json`
 - Cloudflare tunnel credentials
 - ESP32 flash backups
 - ChatGPT cookies/JWTs
+- Claude cookies/session keys
