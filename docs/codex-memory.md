@@ -86,6 +86,34 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:18 SGT — firmware-reset-load-button-actions
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to use the reset/load button, not the top button, so one click toggles the screen on/off and a 5s hold resets Wi-Fi into AP mode.
+
+**What changed**
+- Replaced the broad GPIO button watcher with xingzhi-derived side/button GPIOs `GPIO39` and `GPIO40`, both active-low with pull-up enabled.
+- Short press now toggles LCD display/backlight:
+  - if screen is on, it turns off;
+  - if screen is off, it turns on and immediately fetches status again.
+- Long press for 5 seconds starts Wi-Fi reset SoftAP mode:
+  - SSID `VIBECODE-PUPY-SETUP`
+  - open network, no password
+- The top boot button `GPIO0` and mic/display-related GPIOs are no longer treated as refresh buttons.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified all hashes and hard reset completed.
+- Serial monitor confirmed boot, display init, GPIO39/GPIO40 button watches with initial level `1`, Wi-Fi connection, HTTP 200, and `power battery_raw=2461 battery_pct=100 charge_gpio=0 charging=1`.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, reset/load button short/long press handling and SoftAP reset mode.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+**Follow-ups**
+- [ ] Physically press the reset/load button while serial monitor is open and keep only the matching GPIO (`GPIO39` or `GPIO40`) if one of the two never changes.
+
 ## 2026-05-17 16:12 SGT — firmware-xingzhi-power-config
 
 **Actor**: codex-cli

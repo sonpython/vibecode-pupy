@@ -54,7 +54,9 @@
 #define BATTERY_VALID_MIN_RAW 1200
 #define BUTTON_POLL_MS 100
 #define BUTTON_REFRESH_COOLDOWN_MS 800
+#define BUTTON_LONG_PRESS_MS 5000
 #define STATUS_REFRESH_WAIT_MS (60 * 1000)
+#define WIFI_RESET_AP_SSID "VIBECODE-PUPY-SETUP"
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
@@ -68,6 +70,9 @@ static esp_lcd_panel_io_handle_t s_panel_io;
 static lv_display_t *s_lv_display;
 static adc_oneshot_unit_handle_t s_adc_handle;
 static int s_last_display_battery_pct = 100;
+static bool s_display_enabled = true;
+static bool s_wifi_ap_mode = false;
+static esp_netif_t *s_ap_netif;
 
 typedef struct {
     lv_obj_t *current_pct;
@@ -119,16 +124,23 @@ typedef struct {
 typedef struct {
     gpio_num_t pin;
     const char *name;
+    int active_level;
     int last_level;
+    TickType_t pressed_tick;
+    bool long_sent;
     TickType_t last_trigger_tick;
 } button_watch_t;
 
 static button_watch_t s_buttons[] = {
-    {GPIO_NUM_5, "side-gpio5", -1, 0},
-    {GPIO_NUM_0, "top-boot-gpio0", -1, 0},
-    {GPIO_NUM_47, "power-gpio47", -1, 0},
-    {GPIO_NUM_48, "power-gpio48", -1, 0},
+    {GPIO_NUM_39, "reset-load-gpio39", 0, -1, 0, false, 0},
+    {GPIO_NUM_40, "reset-load-gpio40", 0, -1, 0, false, 0},
 };
+
+typedef enum {
+    BUTTON_ACTION_NONE = 0,
+    BUTTON_ACTION_SHORT_PRESS,
+    BUTTON_ACTION_LONG_PRESS,
+} button_action_t;
 
 static lv_color_t pct_color(int pct)
 {
@@ -542,6 +554,16 @@ static void set_backlight(int level)
 #endif
 }
 
+static void set_display_enabled(bool enabled)
+{
+    s_display_enabled = enabled;
+    set_backlight(enabled ? 1 : 0);
+    if (s_panel) {
+        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, enabled));
+    }
+    ESP_LOGI(TAG, "display %s", enabled ? "on" : "off");
+}
+
 #if HAS_POWER_EN
 static void set_display_power(int level)
 {
@@ -685,6 +707,33 @@ static bool wifi_connect(void)
     return (bits & WIFI_CONNECTED_BIT) != 0;
 }
 
+static void start_wifi_reset_ap(void)
+{
+    set_display_enabled(true);
+    ui_show_message("WIFI RESET", "starting AP");
+    ESP_LOGW(TAG, "starting WiFi reset AP ssid=%s", WIFI_RESET_AP_SSID);
+
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    ESP_ERROR_CHECK(esp_wifi_restore());
+    if (!s_ap_netif) {
+        s_ap_netif = esp_netif_create_default_wifi_ap();
+    }
+
+    wifi_config_t ap_config = {0};
+    strlcpy((char *)ap_config.ap.ssid, WIFI_RESET_AP_SSID, sizeof(ap_config.ap.ssid));
+    ap_config.ap.ssid_len = strlen(WIFI_RESET_AP_SSID);
+    ap_config.ap.channel = 6;
+    ap_config.ap.max_connection = 4;
+    ap_config.ap.authmode = WIFI_AUTH_OPEN;
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    s_wifi_ap_mode = true;
+    ui_show_message("WIFI AP", WIFI_RESET_AP_SSID);
+}
+
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
     http_buffer_t *out = (http_buffer_t *)evt->user_data;
@@ -784,22 +833,35 @@ static void configure_button(void)
         gpio_config_t cfg = {
             .pin_bit_mask = 1ULL << pin,
             .mode = GPIO_MODE_INPUT,
-            .pull_up_en = (pin == GPIO_NUM_0 || pin == GPIO_NUM_5) ? GPIO_PULLUP_ENABLE : GPIO_PULLUP_DISABLE,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
         };
         ESP_ERROR_CHECK(gpio_config(&cfg));
         s_buttons[i].last_level = gpio_get_level(pin);
-        ESP_LOGI(TAG, "button watch %s gpio=%d initial=%d", s_buttons[i].name, pin, s_buttons[i].last_level);
+        if (s_buttons[i].last_level == s_buttons[i].active_level) {
+            s_buttons[i].pressed_tick = xTaskGetTickCount();
+        }
+        ESP_LOGI(TAG, "button watch %s gpio=%d active=%d initial=%d", s_buttons[i].name, pin, s_buttons[i].active_level, s_buttons[i].last_level);
     }
 }
 
-static bool button_fetch_requested(void)
+static button_action_t poll_button_action(void)
 {
     TickType_t now = xTaskGetTickCount();
     TickType_t cooldown = pdMS_TO_TICKS(BUTTON_REFRESH_COOLDOWN_MS);
+    TickType_t long_press = pdMS_TO_TICKS(BUTTON_LONG_PRESS_MS);
 
     for (size_t i = 0; i < sizeof(s_buttons) / sizeof(s_buttons[0]); i++) {
         int level = gpio_get_level(s_buttons[i].pin);
+        bool pressed = level == s_buttons[i].active_level;
+
+        if (pressed && !s_buttons[i].long_sent && s_buttons[i].pressed_tick > 0 && now - s_buttons[i].pressed_tick >= long_press) {
+            s_buttons[i].long_sent = true;
+            s_buttons[i].last_trigger_tick = now;
+            ESP_LOGW(TAG, "long press button=%s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
+            return BUTTON_ACTION_LONG_PRESS;
+        }
+
         if (level == s_buttons[i].last_level) {
             continue;
         }
@@ -808,12 +870,46 @@ static bool button_fetch_requested(void)
         if (level == s_buttons[i].last_level) {
             continue;
         }
+
+        TickType_t press_started = s_buttons[i].pressed_tick;
         s_buttons[i].last_level = level;
+        pressed = level == s_buttons[i].active_level;
+        if (pressed) {
+            s_buttons[i].pressed_tick = now;
+            s_buttons[i].long_sent = false;
+            ESP_LOGI(TAG, "button down %s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
+            continue;
+        }
+
+        s_buttons[i].pressed_tick = 0;
+        if (s_buttons[i].long_sent) {
+            ESP_LOGI(TAG, "button up after long press %s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
+            continue;
+        }
         if (now - s_buttons[i].last_trigger_tick < cooldown) {
             continue;
         }
+        if (press_started > 0 && now - press_started >= long_press) {
+            continue;
+        }
         s_buttons[i].last_trigger_tick = now;
-        ESP_LOGI(TAG, "manual refresh button=%s gpio=%d level=%d", s_buttons[i].name, s_buttons[i].pin, level);
+        ESP_LOGI(TAG, "short press button=%s gpio=%d", s_buttons[i].name, s_buttons[i].pin);
+        return BUTTON_ACTION_SHORT_PRESS;
+    }
+    return BUTTON_ACTION_NONE;
+}
+
+static bool handle_button_action(button_action_t action)
+{
+    if (action == BUTTON_ACTION_LONG_PRESS) {
+        start_wifi_reset_ap();
+        return true;
+    }
+    if (action == BUTTON_ACTION_SHORT_PRESS) {
+        set_display_enabled(!s_display_enabled);
+        if (s_display_enabled && !s_wifi_ap_mode) {
+            ui_show_message("FETCH", "manual");
+        }
         return true;
     }
     return false;
@@ -865,6 +961,11 @@ void app_main(void)
 
     usage_status_t status;
     while (true) {
+        while (!s_display_enabled || s_wifi_ap_mode) {
+            handle_button_action(poll_button_action());
+            vTaskDelay(pdMS_TO_TICKS(BUTTON_POLL_MS));
+        }
+
         ui_set_fetching(true);
         bool got = fetch_usage(&status);
         if (!got) {
@@ -877,7 +978,8 @@ void app_main(void)
             if (elapsed_ms % 1000 == 0) {
                 ui_update_next_fetch((STATUS_REFRESH_WAIT_MS - elapsed_ms) / 1000);
             }
-            if (button_fetch_requested()) {
+            button_action_t action = poll_button_action();
+            if (action != BUTTON_ACTION_NONE && handle_button_action(action)) {
                 break;
             }
             vTaskDelay(pdMS_TO_TICKS(BUTTON_POLL_MS));
