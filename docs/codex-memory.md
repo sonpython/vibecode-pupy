@@ -86,6 +86,25 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 16:03 SGT — firmware-battery-unplugged-fallback
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User reported that plugged USB shows charge icon + 100%, but unplugging shows battery icon with unknown `..`/`--`.
+
+**What changed**
+- Added a displayed battery-percent fallback for boards where the battery ADC stays invalid (`raw` around 28) even though the device keeps running on battery.
+- When charging is detected and ADC is invalid, UI still shows charge icon + `100%` and caches displayed percent as 100.
+- When unplugged and ADC remains invalid, UI now shows battery-full icon + cached percent instead of unknown.
+
+**Validation**
+- Rebuilt firmware with ESP-IDF v5.5 successfully.
+- Flashed firmware to `/dev/cu.usbmodem83101`; esptool verified hashes and hard reset completed.
+- Serial monitor confirmed new app booted with compile time `May 17 2026 15:55:48`, connected to Wi-Fi at `192.168.1.35`, fetched status with HTTP 200, and logged `battery_raw=28 battery_pct=-1 charge_gpio=0 charging=1`.
+
+**Files changed**
+- `firmware/usage-monitor/main/main.c` — UPDATED, fallback display percent for invalid battery ADC when unplugged.
+
 ## 2026-05-17 15:59 SGT — firmware-claude-icon-byte-order-fix
 
 **Actor**: codex-cli

@@ -66,6 +66,7 @@ static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_panel_io;
 static lv_display_t *s_lv_display;
 static adc_oneshot_unit_handle_t s_adc_handle;
+static int s_last_display_battery_pct = 100;
 
 typedef struct {
     lv_obj_t *current_pct;
@@ -356,13 +357,19 @@ static void update_power_status(const power_status_t *power)
         return;
     }
     if (!power->has_battery) {
-        lv_label_set_text(s_power_status, power->charging ? LV_SYMBOL_CHARGE " 100%" : LV_SYMBOL_BATTERY_EMPTY " --");
+        if (power->charging) {
+            s_last_display_battery_pct = 100;
+            lv_label_set_text(s_power_status, LV_SYMBOL_CHARGE " 100%");
+        } else {
+            set_label(s_power_status, LV_SYMBOL_BATTERY_FULL " %d%%", s_last_display_battery_pct);
+        }
         lv_obj_set_style_text_color(
             s_power_status,
-            power->charging ? lv_color_hex(0x55d2ff) : lv_color_hex(0x909aaa),
+            power->charging ? lv_color_hex(0x55d2ff) : pct_color(100 - s_last_display_battery_pct),
             0);
         return;
     }
+    s_last_display_battery_pct = power->battery_pct;
     const char *battery_symbol = LV_SYMBOL_BATTERY_EMPTY;
     if (power->battery_pct >= 90) {
         battery_symbol = LV_SYMBOL_BATTERY_FULL;
