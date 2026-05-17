@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
@@ -9,19 +10,21 @@
 #include "esp_check.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
-#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
+#include "esp_lvgl_port.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "lvgl.h"
 #include "nvs_flash.h"
 
+#include "brand_icons.h"
 #include "secrets.h"
 
 #define LCD_HOST SPI3_HOST
@@ -49,8 +52,19 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num;
 static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_panel_io;
-static uint16_t *s_framebuffer;
-static uint16_t *s_flush_buffer;
+static lv_display_t *s_lv_display;
+
+typedef struct {
+    lv_obj_t *current_pct;
+    lv_obj_t *weekly_pct;
+    lv_obj_t *status;
+    lv_obj_t *current_bar;
+    lv_obj_t *weekly_bar;
+} source_widgets_t;
+
+static source_widgets_t s_claude_ui;
+static source_widgets_t s_codex_ui;
+static lv_obj_t *s_header_status;
 
 typedef struct {
     int current_pct;
@@ -72,259 +86,181 @@ typedef struct {
     int cap;
 } http_buffer_t;
 
-static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
+static lv_color_t pct_color(int pct)
 {
-    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+    if (pct < 0) return lv_color_hex(0x5a606e);
+    if (pct < 50) return lv_color_hex(0x23be78);
+    if (pct < 75) return lv_color_hex(0xf0b42d);
+    if (pct < 90) return lv_color_hex(0xf56e37);
+    return lv_color_hex(0xeb3c50);
 }
 
-static void lcd_draw_rect(int x, int y, int w, int h, uint16_t color)
+static void set_label(lv_obj_t *obj, const char *fmt, ...)
 {
-    if (w <= 0 || h <= 0) {
+    char text[64];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(text, sizeof(text), fmt, args);
+    va_end(args);
+    lv_label_set_text(obj, text);
+}
+
+static void style_bar(lv_obj_t *bar, lv_color_t color)
+{
+    lv_obj_remove_style_all(bar);
+    lv_obj_set_size(bar, 176, 12);
+    lv_obj_set_style_radius(bar, 6, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(0x232935), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(bar, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
+}
+
+static void style_label(lv_obj_t *label, lv_color_t color, const lv_font_t *font)
+{
+    lv_obj_set_style_text_color(label, color, 0);
+    lv_obj_set_style_text_font(label, font, 0);
+    lv_obj_set_style_text_letter_space(label, 0, 0);
+}
+
+static void create_source_row(
+    lv_obj_t *screen,
+    int y,
+    const char *name,
+    const lv_image_dsc_t *icon,
+    source_widgets_t *widgets)
+{
+    lv_obj_t *img = lv_image_create(screen);
+    lv_image_set_src(img, icon);
+    lv_obj_set_pos(img, 14, y + 3);
+
+    lv_obj_t *name_label = lv_label_create(screen);
+    lv_label_set_text(name_label, name);
+    style_label(name_label, lv_color_hex(0xeef2f7), &lv_font_montserrat_18);
+    lv_obj_set_pos(name_label, 56, y);
+
+    widgets->current_pct = lv_label_create(screen);
+    style_label(widgets->current_pct, lv_color_hex(0x55d2ff), &lv_font_montserrat_20);
+    lv_obj_set_width(widgets->current_pct, 70);
+    lv_obj_set_style_text_align(widgets->current_pct, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(widgets->current_pct, 184, y - 2);
+
+    widgets->current_bar = lv_bar_create(screen);
+    style_bar(widgets->current_bar, lv_color_hex(0x55d2ff));
+    lv_obj_set_pos(widgets->current_bar, 56, y + 28);
+
+    lv_obj_t *week_label = lv_label_create(screen);
+    lv_label_set_text(week_label, "WEEK");
+    style_label(week_label, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_pos(week_label, 56, y + 46);
+
+    widgets->weekly_bar = lv_bar_create(screen);
+    style_bar(widgets->weekly_bar, lv_color_hex(0x55d2ff));
+    lv_obj_set_size(widgets->weekly_bar, 64, 8);
+    lv_obj_set_pos(widgets->weekly_bar, 98, y + 50);
+
+    widgets->weekly_pct = lv_label_create(screen);
+    style_label(widgets->weekly_pct, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_pos(widgets->weekly_pct, 170, y + 45);
+
+    widgets->status = lv_label_create(screen);
+    style_label(widgets->status, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_width(widgets->status, 54);
+    lv_obj_set_style_text_align(widgets->status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(widgets->status, 204, y + 45);
+}
+
+static void update_source_row(source_widgets_t *widgets, const source_status_t *source)
+{
+    int current = MAX(0, MIN(source->current_pct, 100));
+    int weekly = MAX(0, MIN(source->weekly_pct, 100));
+    lv_color_t current_color = strcmp(source->status, "ok") == 0 ? pct_color(source->current_pct) : lv_color_hex(0xeb505a);
+    lv_color_t weekly_color = pct_color(source->weekly_pct);
+
+    set_label(widgets->current_pct, "%d%%", source->current_pct);
+    lv_obj_set_style_text_color(widgets->current_pct, current_color, 0);
+    lv_obj_set_style_bg_color(widgets->current_bar, current_color, LV_PART_INDICATOR);
+    lv_bar_set_value(widgets->current_bar, current, LV_ANIM_ON);
+
+    set_label(widgets->weekly_pct, "%d%%", source->weekly_pct);
+    lv_obj_set_style_bg_color(widgets->weekly_bar, weekly_color, LV_PART_INDICATOR);
+    lv_bar_set_value(widgets->weekly_bar, weekly, LV_ANIM_ON);
+
+    lv_label_set_text(widgets->status, strcmp(source->status, "ok") == 0 ? "OK" : source->status);
+    lv_obj_set_style_text_color(widgets->status, strcmp(source->status, "ok") == 0 ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
+}
+
+static void ui_build_status_screen(void)
+{
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_clean(screen);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0c0f16), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+
+    lv_obj_t *title = lv_label_create(screen);
+    lv_label_set_text(title, "VIBECODE");
+    style_label(title, lv_color_hex(0x55d2ff), &lv_font_montserrat_20);
+    lv_obj_set_pos(title, 14, 10);
+
+    s_header_status = lv_label_create(screen);
+    style_label(s_header_status, lv_color_hex(0x50dc96), &lv_font_montserrat_12);
+    lv_obj_set_width(s_header_status, 94);
+    lv_obj_set_style_text_align(s_header_status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(s_header_status, 162, 16);
+
+    create_source_row(screen, 54, "CLAUDE", &brand_icon_claude, &s_claude_ui);
+    create_source_row(screen, 128, "CODEX", &brand_icon_openai, &s_codex_ui);
+
+    lv_obj_t *refresh = lv_label_create(screen);
+    lv_label_set_text(refresh, "BTN REFRESH");
+    style_label(refresh, lv_color_hex(0x788291), &lv_font_montserrat_12);
+    lv_obj_set_pos(refresh, 14, 216);
+
+    lv_obj_t *spinner = lv_spinner_create(screen);
+    lv_obj_set_size(spinner, 22, 22);
+    lv_obj_set_pos(spinner, 232, 208);
+    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x263040), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(spinner, 3, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(spinner, lv_color_hex(0x55d2ff), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(spinner, 3, LV_PART_INDICATOR);
+}
+
+static void ui_show_message(const char *line1, const char *line2)
+{
+    if (!lvgl_port_lock(0)) {
         return;
     }
-    x = MAX(0, MIN(x, LCD_WIDTH - 1));
-    y = MAX(0, MIN(y, LCD_HEIGHT - 1));
-    w = MIN(w, LCD_WIDTH - x);
-    h = MIN(h, LCD_HEIGHT - y);
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_clean(screen);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0c0f16), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
-    if (s_framebuffer) {
-        for (int row = 0; row < h; row++) {
-            uint16_t *line = s_framebuffer + (y + row) * LCD_WIDTH + x;
-            for (int col = 0; col < w; col++) {
-                line[col] = color;
-            }
-        }
+    lv_obj_t *title = lv_label_create(screen);
+    lv_label_set_text(title, line1);
+    style_label(title, lv_color_hex(0xeef2f7), &lv_font_montserrat_20);
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -18);
+
+    lv_obj_t *message = lv_label_create(screen);
+    lv_label_set_text(message, line2);
+    style_label(message, lv_color_hex(0x909aaa), &lv_font_montserrat_14);
+    lv_obj_set_width(message, 240);
+    lv_obj_set_style_text_align(message, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(message, LV_ALIGN_CENTER, 0, 16);
+    lvgl_port_unlock();
+}
+
+static void ui_update_status(const usage_status_t *status)
+{
+    if (!lvgl_port_lock(0)) {
         return;
     }
-
-    if (!s_panel) {
-        return;
-    }
-    uint16_t *line = heap_caps_malloc(w * sizeof(uint16_t), MALLOC_CAP_DMA);
-    if (!line) {
-        return;
-    }
-    for (int i = 0; i < w; i++) {
-        line[i] = color;
-    }
-    for (int row = 0; row < h; row++) {
-        esp_lcd_panel_draw_bitmap(s_panel, x, y + row, x + w, y + row + 1, line);
-    }
-    free(line);
-}
-
-static void lcd_flush(void)
-{
-    if (!s_panel || !s_framebuffer) {
-        return;
-    }
-    if (!s_flush_buffer) {
-        esp_lcd_panel_draw_bitmap(s_panel, 0, 0, LCD_WIDTH, LCD_HEIGHT, s_framebuffer);
-        return;
-    }
-
-    const int chunk_h = 20;
-    for (int y = 0; y < LCD_HEIGHT; y += chunk_h) {
-        int h = MIN(chunk_h, LCD_HEIGHT - y);
-        for (int row = 0; row < h; row++) {
-            memcpy(s_flush_buffer + row * LCD_WIDTH, s_framebuffer + (y + row) * LCD_WIDTH, LCD_WIDTH * sizeof(uint16_t));
-        }
-        esp_lcd_panel_draw_bitmap(s_panel, 0, y, LCD_WIDTH, y + h, s_flush_buffer);
-    }
-}
-
-static const uint8_t *glyph5x7(char c)
-{
-    static const uint8_t space[5] = {0, 0, 0, 0, 0};
-    static const uint8_t dash[5] = {0x08, 0x08, 0x08, 0x08, 0x08};
-    static const uint8_t colon[5] = {0, 0x14, 0, 0x14, 0};
-    static const uint8_t pct[5] = {0x62, 0x64, 0x08, 0x13, 0x23};
-    static const uint8_t digits[10][5] = {
-        {0x3E, 0x51, 0x49, 0x45, 0x3E},
-        {0x00, 0x42, 0x7F, 0x40, 0x00},
-        {0x42, 0x61, 0x51, 0x49, 0x46},
-        {0x21, 0x41, 0x45, 0x4B, 0x31},
-        {0x18, 0x14, 0x12, 0x7F, 0x10},
-        {0x27, 0x45, 0x45, 0x45, 0x39},
-        {0x3C, 0x4A, 0x49, 0x49, 0x30},
-        {0x01, 0x71, 0x09, 0x05, 0x03},
-        {0x36, 0x49, 0x49, 0x49, 0x36},
-        {0x06, 0x49, 0x49, 0x29, 0x1E},
-    };
-    static const uint8_t letters[26][5] = {
-        {0x7E, 0x11, 0x11, 0x11, 0x7E}, {0x7F, 0x49, 0x49, 0x49, 0x36},
-        {0x3E, 0x41, 0x41, 0x41, 0x22}, {0x7F, 0x41, 0x41, 0x22, 0x1C},
-        {0x7F, 0x49, 0x49, 0x49, 0x41}, {0x7F, 0x09, 0x09, 0x09, 0x01},
-        {0x3E, 0x41, 0x49, 0x49, 0x7A}, {0x7F, 0x08, 0x08, 0x08, 0x7F},
-        {0x00, 0x41, 0x7F, 0x41, 0x00}, {0x20, 0x40, 0x41, 0x3F, 0x01},
-        {0x7F, 0x08, 0x14, 0x22, 0x41}, {0x7F, 0x40, 0x40, 0x40, 0x40},
-        {0x7F, 0x02, 0x0C, 0x02, 0x7F}, {0x7F, 0x04, 0x08, 0x10, 0x7F},
-        {0x3E, 0x41, 0x41, 0x41, 0x3E}, {0x7F, 0x09, 0x09, 0x09, 0x06},
-        {0x3E, 0x41, 0x51, 0x21, 0x5E}, {0x7F, 0x09, 0x19, 0x29, 0x46},
-        {0x46, 0x49, 0x49, 0x49, 0x31}, {0x01, 0x01, 0x7F, 0x01, 0x01},
-        {0x3F, 0x40, 0x40, 0x40, 0x3F}, {0x1F, 0x20, 0x40, 0x20, 0x1F},
-        {0x3F, 0x40, 0x38, 0x40, 0x3F}, {0x63, 0x14, 0x08, 0x14, 0x63},
-        {0x07, 0x08, 0x70, 0x08, 0x07}, {0x61, 0x51, 0x49, 0x45, 0x43},
-    };
-    if (c >= 'a' && c <= 'z') {
-        c -= 32;
-    }
-    if (c >= 'A' && c <= 'Z') {
-        return letters[c - 'A'];
-    }
-    if (c >= '0' && c <= '9') {
-        return digits[c - '0'];
-    }
-    if (c == '-') return dash;
-    if (c == ':') return colon;
-    if (c == '%') return pct;
-    return space;
-}
-
-static void draw_char(int x, int y, char c, uint16_t color, int scale)
-{
-    const uint8_t *g = glyph5x7(c);
-    for (int col = 0; col < 5; col++) {
-        for (int row = 0; row < 7; row++) {
-            if (g[col] & (1 << row)) {
-                lcd_draw_rect(x + col * scale, y + row * scale, scale, scale, color);
-            }
-        }
-    }
-}
-
-static void draw_text(int x, int y, const char *text, uint16_t color, int scale)
-{
-    int cursor = x;
-    while (*text) {
-        draw_char(cursor, y, *text++, color, scale);
-        cursor += 6 * scale;
-    }
-}
-
-static const uint32_t ICON_CLAUDE[32] = {
-    0x00e00000u, 0x01f07000u, 0x01f07800u, 0x00f87020u,
-    0x00f870f0u, 0x007871f0u, 0x1c7c73f0u, 0x3e3c73e0u,
-    0x1f1ee7e0u, 0x1fdeefc0u, 0x07ffff80u, 0x03ffff00u,
-    0x00ffff02u, 0x007ffe7fu, 0x001fffffu, 0xfffffffcu,
-    0xffffffc0u, 0x07fffffcu, 0x001fffffu, 0x007fffffu,
-    0x01fffe1fu, 0x03ffff00u, 0x0fcfffc0u, 0x1f1ddfe0u,
-    0x1e39def0u, 0x0079cf78u, 0x00f1c798u, 0x00e38780u,
-    0x01c38380u, 0x01838180u, 0x00038000u, 0x00038000u,
-};
-
-static const uint32_t ICON_OPENAI[32] = {
-    0x001fc000u, 0x003ff000u, 0x00fffb00u, 0x00f07fc0u,
-    0x01c0fff0u, 0x03c1f8f8u, 0x0f87e03cu, 0x1f9f801cu,
-    0x3f9e1e0eu, 0x7b987f8eu, 0x7398f7eeu, 0xe39be1feu,
-    0xe39ff0feu, 0xe39e3c3eu, 0xe3981f0eu, 0xe3981fc7u,
-    0xf3f81dc7u, 0x70f81ce3u, 0x787c1ce3u, 0x3e1f7ce3u,
-    0x3f87fce7u, 0x3fe7dce7u, 0x39ff1cefu, 0x38fc3cfeu,
-    0x38387cfcu, 0x1c01f9f8u, 0x1e07e1e0u, 0x0fff83c0u,
-    0x07fe0780u, 0x01ff1f80u, 0x000fff00u, 0x0003fc00u,
-};
-
-static void draw_icon_mask(int x, int y, const uint32_t *mask, uint16_t color)
-{
-    for (int row = 0; row < 32; row++) {
-        for (int col = 0; col < 32; col++) {
-            if (mask[row] & (1u << (31 - col))) {
-                lcd_draw_rect(x + col, y + row, 1, 1, color);
-            }
-        }
-    }
-}
-
-static uint16_t pct_color(int pct)
-{
-    if (pct < 0) return rgb565(90, 96, 110);
-    if (pct < 50) return rgb565(35, 190, 120);
-    if (pct < 75) return rgb565(240, 180, 45);
-    if (pct < 90) return rgb565(245, 110, 55);
-    return rgb565(235, 60, 80);
-}
-
-static void draw_bar(int x, int y, int w, int h, int pct, uint16_t color)
-{
-    int clamped = MAX(0, MIN(pct, 100));
-    lcd_draw_rect(x, y, w, h, rgb565(34, 39, 50));
-    lcd_draw_rect(x + 2, y + 2, (w - 4) * clamped / 100, h - 4, color);
-}
-
-static void draw_icon_claude(int cx, int cy, int frame)
-{
-    uint16_t bg = rgb565(12, 15, 22);
-    (void)frame;
-    lcd_draw_rect(cx - 17, cy - 17, 34, 34, bg);
-    draw_icon_mask(cx - 16, cy - 16, ICON_CLAUDE, rgb565(217, 119, 87));
-}
-
-static void draw_icon_codex(int cx, int cy, int frame)
-{
-    uint16_t bg = rgb565(12, 15, 22);
-    (void)frame;
-    lcd_draw_rect(cx - 17, cy - 17, 34, 34, bg);
-    draw_icon_mask(cx - 16, cy - 16, ICON_OPENAI, rgb565(85, 210, 255));
-}
-
-static void draw_activity(int frame)
-{
-    int x = 146 + (frame % 18) * 5;
-    uint16_t bg = rgb565(12, 15, 22);
-    uint16_t muted = rgb565(120, 130, 145);
-    uint16_t active = rgb565(85, 210, 255);
-
-    lcd_draw_rect(142, 214, 102, 14, bg);
-    for (int i = 0; i < 18; i++) {
-        lcd_draw_rect(146 + i * 5, 220, 2, 2, muted);
-    }
-    lcd_draw_rect(x, 218, 8, 6, active);
-}
-
-static void draw_source(int y, const char *name, const source_status_t *source, bool is_codex, int frame)
-{
-    char label[32];
-    uint16_t white = rgb565(238, 242, 247);
-    uint16_t muted = rgb565(145, 154, 170);
-    uint16_t color = strcmp(source->status, "ok") == 0 ? pct_color(source->current_pct) : rgb565(235, 80, 90);
-
-    if (is_codex) {
-        draw_icon_codex(27, y + 14, frame);
-    } else {
-        draw_icon_claude(27, y + 14, frame);
-    }
-    draw_text(50, y, name, white, 2);
-    snprintf(label, sizeof(label), "%d%%", source->current_pct);
-    draw_text(178, y, label, color, 2);
-    draw_bar(50, y + 22, 176, 14, source->current_pct, color);
-
-    snprintf(label, sizeof(label), "WEEK %d%%", source->weekly_pct);
-    draw_text(50, y + 42, label, muted, 1);
-    draw_bar(128, y + 42, 58, 8, source->weekly_pct, pct_color(source->weekly_pct));
-
-    if (strcmp(source->status, "ok") != 0) {
-        draw_text(190, y + 42, source->status, rgb565(235, 80, 90), 1);
-    }
-}
-
-static void draw_status_screen(const usage_status_t *status, int frame)
-{
-    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(12, 15, 22));
-    draw_text(14, 12, "VIBECODE", rgb565(85, 210, 255), 2);
-    draw_text(14, 34, status->ok ? "LIVE" : status->message, status->ok ? rgb565(80, 220, 150) : rgb565(240, 90, 90), 1);
-    draw_source(58, "CLAUDE", &status->claude, false, frame);
-    draw_source(132, "CODEX", &status->codex, true, frame);
-    draw_text(14, 216, "BTN REFRESH", rgb565(120, 130, 145), 1);
-    draw_activity(frame);
-    lcd_flush();
-}
-
-static void draw_message(const char *line1, const char *line2)
-{
-    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(12, 15, 22));
-    draw_text(20, 82, line1, rgb565(238, 242, 247), 2);
-    draw_text(20, 112, line2, rgb565(145, 154, 170), 1);
-    lcd_flush();
+    ui_build_status_screen();
+    lv_label_set_text(s_header_status, status->ok ? "LIVE" : status->message);
+    lv_obj_set_style_text_color(s_header_status, status->ok ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
+    update_source_row(&s_claude_ui, &status->claude);
+    update_source_row(&s_codex_ui, &status->codex);
+    lvgl_port_unlock();
 }
 
 static void set_backlight(int level)
@@ -398,16 +334,38 @@ static void init_display(void)
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, true, false));
     ESP_ERROR_CHECK(esp_lcd_panel_set_gap(s_panel, LCD_OFFSET_X, LCD_OFFSET_Y));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
-    s_framebuffer = heap_caps_malloc(LCD_WIDTH * LCD_HEIGHT * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    s_flush_buffer = heap_caps_malloc(LCD_WIDTH * 20 * sizeof(uint16_t), MALLOC_CAP_DMA);
-    if (!s_framebuffer || !s_flush_buffer) {
-        ESP_LOGW(TAG, "framebuffer allocation failed, falling back to direct draws");
-        free(s_framebuffer);
-        free(s_flush_buffer);
-        s_framebuffer = NULL;
-        s_flush_buffer = NULL;
-    }
-    draw_message("BOOTING", "display ok");
+
+    lv_init();
+    lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    port_cfg.task_priority = 1;
+    port_cfg.timer_period_ms = 16;
+    ESP_ERROR_CHECK(lvgl_port_init(&port_cfg));
+
+    const lvgl_port_display_cfg_t display_cfg = {
+        .io_handle = s_panel_io,
+        .panel_handle = s_panel,
+        .buffer_size = LCD_WIDTH * 40,
+        .double_buffer = true,
+        .hres = LCD_WIDTH,
+        .vres = LCD_HEIGHT,
+        .monochrome = false,
+        .rotation = {
+            .swap_xy = false,
+            .mirror_x = false,
+            .mirror_y = false,
+        },
+        .flags = {
+            .buff_dma = 1,
+            .swap_bytes = 1,
+            .full_refresh = 0,
+            .direct_mode = 0,
+        },
+    };
+    s_lv_display = lvgl_port_add_disp(&display_cfg);
+    ESP_ERROR_CHECK(s_lv_display ? ESP_OK : ESP_FAIL);
+    lv_display_set_default(s_lv_display);
+
+    ui_show_message("BOOTING", "display ok");
     set_backlight(1);
     ESP_LOGI(TAG, "display initialized");
 }
@@ -564,34 +522,28 @@ void app_main(void)
 
     init_display();
     configure_button();
-    draw_message("WIFI", WIFI_SSID);
+    ui_show_message("WIFI", WIFI_SSID);
 
     if (!wifi_connect()) {
         ESP_LOGE(TAG, "WiFi failed");
-        draw_message("WIFI FAIL", "check ssid/pass");
+        ui_show_message("WIFI FAIL", "check ssid/pass");
         return;
     }
 
     usage_status_t status;
     while (true) {
-        draw_message("FETCHING", "vibecode api");
+        ui_show_message("FETCHING", "vibecode api");
         bool got = fetch_usage(&status);
         if (!got) {
             status.ok = false;
         }
-        int frame = 0;
-        draw_status_screen(&status, frame);
+        ui_update_status(&status);
 
         for (int i = 0; i < 240; i++) {
             if (gpio_get_level(PIN_BUTTON) == 0) {
                 vTaskDelay(pdMS_TO_TICKS(250));
                 break;
             }
-            frame++;
-            draw_icon_claude(27, 72, frame);
-            draw_icon_codex(27, 146, frame);
-            draw_activity(frame);
-            lcd_flush();
             vTaskDelay(pdMS_TO_TICKS(250));
         }
     }

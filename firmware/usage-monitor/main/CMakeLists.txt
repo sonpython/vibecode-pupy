@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c"
+    SRCS "main.c" "brand_icons.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
@@ -10,6 +10,8 @@ idf_component_register(
         esp_psram
         esp-tls
         esp_wifi
+        esp_lvgl_port
         json
+        lvgl
         nvs_flash
 )
