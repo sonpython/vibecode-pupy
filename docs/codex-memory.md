@@ -86,6 +86,31 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 14:42 SGT — pupy-screen-redesign
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to redesign the robot screen, reduce weekly usage to a small circular chart, move battery to top-right icon form, show reset remaining time, show live/fetch status at bottom, show next-fetch countdown at bottom-right, and rename the title to `VIBECODE PUPY`.
+
+### ✅ Done
+- Redesigned ESP32 LVGL screen layout:
+  - Top-left title changed to `VIBECODE PUPY`.
+  - Top-right battery now uses LVGL battery/charge symbols with compact percentage/unknown state.
+  - Each source row shows icon, current percent, current usage bar, and reset remaining text like `RESET 4h 12m  19:00`.
+  - Weekly usage is now a small circular LVGL arc with percent label.
+  - Bottom-left shows `LIVE` / `FETCH` / `ERROR` plus status symbol.
+  - Bottom-right shows `NEXT mm:ss` countdown to the next automatic fetch.
+- Disabled the temporary Cloudflare/ttyd remote-control sessions and removed local runtime credential/log files after user clarified they wanted OpenAI native remote control instead.
+- Rebuilt and flashed firmware; monitor verified boot, display init, Wi-Fi connect, HTTP 200 fetch, and power status log.
+
+### 📁 Files changed
+- `firmware/usage-monitor/main/main.c` — UPDATED, full screen layout redesign and next-fetch countdown.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+### 🔑 Key decisions
+- Used only LVGL fonts already enabled in the firmware (`12/14/18/20`) to avoid increasing binary/config churn.
+- Used text `NEXT mm:ss` for the lower-right countdown because the bundled LVGL symbol set does not include an hourglass glyph.
+
 ## 2026-05-17 14:31 SGT — reset-time-and-manual-refresh-firmware
 
 **Actor**: codex-cli

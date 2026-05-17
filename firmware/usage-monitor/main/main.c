@@ -76,6 +76,7 @@ typedef struct {
     lv_obj_t *status;
     lv_obj_t *current_bar;
     lv_obj_t *weekly_bar;
+    lv_obj_t *reset_text;
 } source_widgets_t;
 
 static source_widgets_t s_claude_ui;
@@ -83,9 +84,11 @@ static source_widgets_t s_codex_ui;
 static lv_obj_t *s_header_status;
 static lv_obj_t *s_power_status;
 static lv_obj_t *s_fetch_status;
+static lv_obj_t *s_next_fetch_status;
 
 typedef struct {
     int current_pct;
+    int current_resets_in_sec;
     int weekly_pct;
     int stale_sec;
     char status[20];
@@ -151,13 +154,29 @@ static void set_label(lv_obj_t *obj, const char *fmt, ...)
 static void style_bar(lv_obj_t *bar, lv_color_t color)
 {
     lv_obj_remove_style_all(bar);
-    lv_obj_set_size(bar, 176, 12);
-    lv_obj_set_style_radius(bar, 6, LV_PART_MAIN);
+    lv_obj_set_size(bar, 142, 10);
+    lv_obj_set_style_radius(bar, 5, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, lv_color_hex(0x232935), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bar, 5, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
+}
+
+static void style_week_arc(lv_obj_t *arc, lv_color_t color)
+{
+    lv_obj_remove_style_all(arc);
+    lv_obj_set_size(arc, 46, 46);
+    lv_arc_set_rotation(arc, 270);
+    lv_arc_set_bg_angles(arc, 0, 360);
+    lv_arc_set_range(arc, 0, 100);
+    lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
+    lv_obj_set_style_arc_width(arc, 5, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc, lv_color_hex(0x252b36), LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, 5, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc, color, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR);
 }
 
 static void style_label(lv_obj_t *label, lv_color_t color, const lv_font_t *font)
@@ -165,6 +184,22 @@ static void style_label(lv_obj_t *label, lv_color_t color, const lv_font_t *font
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_letter_space(label, 0, 0);
+}
+
+static void format_duration(int seconds, char *out, size_t out_size)
+{
+    if (seconds <= 0) {
+        strlcpy(out, "--", out_size);
+        return;
+    }
+    int minutes = (seconds + 59) / 60;
+    int hours = minutes / 60;
+    minutes %= 60;
+    if (hours > 0) {
+        snprintf(out, out_size, "%dh %02dm", hours, minutes);
+    } else {
+        snprintf(out, out_size, "%dm", minutes);
+    }
 }
 
 static void create_source_row(
@@ -176,42 +211,45 @@ static void create_source_row(
 {
     lv_obj_t *img = lv_image_create(screen);
     lv_image_set_src(img, icon);
-    lv_obj_set_pos(img, 14, y + 3);
+    lv_obj_set_pos(img, 14, y + 8);
 
     lv_obj_t *name_label = lv_label_create(screen);
     lv_label_set_text(name_label, name);
-    style_label(name_label, lv_color_hex(0xeef2f7), &lv_font_montserrat_18);
+    style_label(name_label, lv_color_hex(0xeef2f7), &lv_font_montserrat_14);
     lv_obj_set_pos(name_label, 56, y);
 
     widgets->current_pct = lv_label_create(screen);
     style_label(widgets->current_pct, lv_color_hex(0x55d2ff), &lv_font_montserrat_20);
-    lv_obj_set_width(widgets->current_pct, 70);
-    lv_obj_set_style_text_align(widgets->current_pct, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(widgets->current_pct, 184, y - 2);
+    lv_obj_set_width(widgets->current_pct, 76);
+    lv_obj_set_style_text_align(widgets->current_pct, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_pos(widgets->current_pct, 56, y + 20);
 
     widgets->current_bar = lv_bar_create(screen);
     style_bar(widgets->current_bar, lv_color_hex(0x55d2ff));
-    lv_obj_set_pos(widgets->current_bar, 56, y + 28);
+    lv_obj_set_pos(widgets->current_bar, 56, y + 45);
 
-    lv_obj_t *week_label = lv_label_create(screen);
-    lv_label_set_text(week_label, "WEEK");
-    style_label(week_label, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
-    lv_obj_set_pos(week_label, 56, y + 46);
+    widgets->reset_text = lv_label_create(screen);
+    lv_label_set_text(widgets->reset_text, "RESET --");
+    style_label(widgets->reset_text, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_width(widgets->reset_text, 142);
+    lv_obj_set_pos(widgets->reset_text, 56, y + 58);
 
-    widgets->weekly_bar = lv_bar_create(screen);
-    style_bar(widgets->weekly_bar, lv_color_hex(0x55d2ff));
-    lv_obj_set_size(widgets->weekly_bar, 64, 8);
-    lv_obj_set_pos(widgets->weekly_bar, 98, y + 50);
+    widgets->weekly_bar = lv_arc_create(screen);
+    style_week_arc(widgets->weekly_bar, lv_color_hex(0x55d2ff));
+    lv_obj_set_pos(widgets->weekly_bar, 214, y + 8);
 
     widgets->weekly_pct = lv_label_create(screen);
     style_label(widgets->weekly_pct, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
-    lv_obj_set_pos(widgets->weekly_pct, 170, y + 45);
+    lv_obj_set_width(widgets->weekly_pct, 44);
+    lv_obj_set_style_text_align(widgets->weekly_pct, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(widgets->weekly_pct, 215, y + 22);
 
     widgets->status = lv_label_create(screen);
-    style_label(widgets->status, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
-    lv_obj_set_width(widgets->status, 54);
-    lv_obj_set_style_text_align(widgets->status, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(widgets->status, 204, y + 45);
+    lv_label_set_text(widgets->status, "WEEK");
+    style_label(widgets->status, lv_color_hex(0x788291), &lv_font_montserrat_12);
+    lv_obj_set_width(widgets->status, 44);
+    lv_obj_set_style_text_align(widgets->status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(widgets->status, 215, y + 55);
 }
 
 static void update_source_row(source_widgets_t *widgets, const source_status_t *source)
@@ -220,21 +258,25 @@ static void update_source_row(source_widgets_t *widgets, const source_status_t *
     int weekly = MAX(0, MIN(source->weekly_pct, 100));
     lv_color_t current_color = strcmp(source->status, "ok") == 0 ? pct_color(source->current_pct) : lv_color_hex(0xeb505a);
     lv_color_t weekly_color = pct_color(source->weekly_pct);
+    char reset_duration[16];
 
-    set_label(widgets->current_pct, "%d%%", source->current_pct);
+    set_label(widgets->current_pct, source->current_pct >= 0 ? "%d%%" : "--", source->current_pct);
     lv_obj_set_style_text_color(widgets->current_pct, current_color, 0);
     lv_obj_set_style_bg_color(widgets->current_bar, current_color, LV_PART_INDICATOR);
     lv_bar_set_value(widgets->current_bar, current, LV_ANIM_ON);
 
-    set_label(widgets->weekly_pct, "%d%%", source->weekly_pct);
-    lv_obj_set_style_bg_color(widgets->weekly_bar, weekly_color, LV_PART_INDICATOR);
-    lv_bar_set_value(widgets->weekly_bar, weekly, LV_ANIM_ON);
+    set_label(widgets->weekly_pct, source->weekly_pct >= 0 ? "%d%%" : "--", source->weekly_pct);
+    lv_obj_set_style_arc_color(widgets->weekly_bar, weekly_color, LV_PART_INDICATOR);
+    lv_arc_set_value(widgets->weekly_bar, weekly);
 
-    lv_label_set_text(widgets->status, strcmp(source->status, "ok") == 0 ? "OK" : source->status);
-    if (strcmp(source->status, "ok") == 0 && source->current_reset_gmt7[0] != 0) {
-        set_label(widgets->status, "R%s", source->current_reset_gmt7);
+    if (strcmp(source->status, "ok") == 0) {
+        format_duration(source->current_resets_in_sec, reset_duration, sizeof(reset_duration));
+        set_label(widgets->reset_text, "RESET %s  %s", reset_duration, source->current_reset_gmt7);
+        lv_obj_set_style_text_color(widgets->reset_text, lv_color_hex(0x909aaa), 0);
+    } else {
+        lv_label_set_text(widgets->reset_text, source->status);
+        lv_obj_set_style_text_color(widgets->reset_text, lv_color_hex(0xeb505a), 0);
     }
-    lv_obj_set_style_text_color(widgets->status, strcmp(source->status, "ok") == 0 ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
 }
 
 static int battery_pct_from_adc(int raw)
@@ -325,14 +367,24 @@ static void update_power_status(const power_status_t *power)
         return;
     }
     if (!power->has_battery) {
-        lv_label_set_text(s_power_status, power->charging ? "CHG --" : "BAT --");
+        lv_label_set_text(s_power_status, power->charging ? LV_SYMBOL_CHARGE " --" : LV_SYMBOL_BATTERY_EMPTY " --");
         lv_obj_set_style_text_color(
             s_power_status,
             power->charging ? lv_color_hex(0x55d2ff) : lv_color_hex(0x909aaa),
             0);
         return;
     }
-    set_label(s_power_status, "%s %d%%", power->charging ? "CHG" : "BAT", power->battery_pct);
+    const char *battery_symbol = LV_SYMBOL_BATTERY_EMPTY;
+    if (power->battery_pct >= 90) {
+        battery_symbol = LV_SYMBOL_BATTERY_FULL;
+    } else if (power->battery_pct >= 65) {
+        battery_symbol = LV_SYMBOL_BATTERY_3;
+    } else if (power->battery_pct >= 35) {
+        battery_symbol = LV_SYMBOL_BATTERY_2;
+    } else if (power->battery_pct >= 10) {
+        battery_symbol = LV_SYMBOL_BATTERY_1;
+    }
+    set_label(s_power_status, "%s %d", power->charging ? LV_SYMBOL_CHARGE : battery_symbol, power->battery_pct);
     lv_obj_set_style_text_color(
         s_power_status,
         power->charging ? lv_color_hex(0x55d2ff) : pct_color(100 - power->battery_pct),
@@ -349,15 +401,39 @@ static void update_fetch_status(bool fetching, bool ok)
     if (fetching) {
         lv_label_set_text(s_fetch_status, LV_SYMBOL_REFRESH);
         lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0x55d2ff), 0);
+        if (s_header_status) {
+            lv_label_set_text(s_header_status, "FETCH");
+            lv_obj_set_style_text_color(s_header_status, lv_color_hex(0x55d2ff), 0);
+        }
         return;
     }
     if (ok) {
         lv_label_set_text(s_fetch_status, LV_SYMBOL_OK);
         lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0x50dc96), 0);
+        if (s_header_status) {
+            lv_label_set_text(s_header_status, "LIVE");
+            lv_obj_set_style_text_color(s_header_status, lv_color_hex(0x50dc96), 0);
+        }
         return;
     }
     lv_label_set_text(s_fetch_status, LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_color(s_fetch_status, lv_color_hex(0xeb505a), 0);
+    if (s_header_status) {
+        lv_label_set_text(s_header_status, "ERROR");
+        lv_obj_set_style_text_color(s_header_status, lv_color_hex(0xeb505a), 0);
+    }
+}
+
+static void ui_update_next_fetch(int seconds_left)
+{
+    if (!lvgl_port_lock(0)) {
+        return;
+    }
+    if (s_next_fetch_status) {
+        seconds_left = MAX(0, seconds_left);
+        set_label(s_next_fetch_status, "NEXT %02d:%02d", seconds_left / 60, seconds_left % 60);
+    }
+    lvgl_port_unlock();
 }
 
 static void ui_set_fetching(bool fetching)
@@ -372,8 +448,6 @@ static void ui_set_fetching(bool fetching)
         }
         return;
     }
-    lv_label_set_text(s_header_status, fetching ? "FETCH" : "LIVE");
-    lv_obj_set_style_text_color(s_header_status, fetching ? lv_color_hex(0x55d2ff) : lv_color_hex(0x50dc96), 0);
     update_fetch_status(fetching, true);
     lvgl_port_unlock();
 }
@@ -386,37 +460,40 @@ static void ui_build_status_screen(void)
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
     lv_obj_t *title = lv_label_create(screen);
-    lv_label_set_text(title, "VIBECODE");
+    lv_label_set_text(title, "VIBECODE PUPY");
     style_label(title, lv_color_hex(0x55d2ff), &lv_font_montserrat_20);
-    lv_obj_set_pos(title, 14, 10);
-
-    s_header_status = lv_label_create(screen);
-    style_label(s_header_status, lv_color_hex(0x50dc96), &lv_font_montserrat_12);
-    lv_obj_set_width(s_header_status, 94);
-    lv_obj_set_style_text_align(s_header_status, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(s_header_status, 162, 16);
-
-    create_source_row(screen, 54, "CLAUDE", &brand_icon_claude, &s_claude_ui);
-    create_source_row(screen, 128, "CODEX", &brand_icon_openai, &s_codex_ui);
-
-    lv_obj_t *refresh = lv_label_create(screen);
-    lv_label_set_text(refresh, "BTN REFRESH");
-    style_label(refresh, lv_color_hex(0x788291), &lv_font_montserrat_12);
-    lv_obj_set_pos(refresh, 14, 216);
+    lv_obj_set_width(title, 180);
+    lv_obj_set_pos(title, 12, 8);
 
     s_power_status = lv_label_create(screen);
-    lv_label_set_text(s_power_status, "BAT --");
-    style_label(s_power_status, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
-    lv_obj_set_width(s_power_status, 90);
+    lv_label_set_text(s_power_status, LV_SYMBOL_BATTERY_EMPTY " --");
+    style_label(s_power_status, lv_color_hex(0x909aaa), &lv_font_montserrat_14);
+    lv_obj_set_width(s_power_status, 66);
     lv_obj_set_style_text_align(s_power_status, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(s_power_status, 134, 216);
+    lv_obj_set_pos(s_power_status, 202, 9);
+
+    create_source_row(screen, 40, "CLAUDE", &brand_icon_claude, &s_claude_ui);
+    create_source_row(screen, 122, "CODEX", &brand_icon_openai, &s_codex_ui);
+
+    s_header_status = lv_label_create(screen);
+    lv_label_set_text(s_header_status, "LIVE");
+    style_label(s_header_status, lv_color_hex(0x50dc96), &lv_font_montserrat_12);
+    lv_obj_set_width(s_header_status, 58);
+    lv_obj_set_pos(s_header_status, 14, 216);
 
     s_fetch_status = lv_label_create(screen);
-    lv_label_set_text(s_fetch_status, LV_SYMBOL_REFRESH);
-    style_label(s_fetch_status, lv_color_hex(0x788291), &lv_font_montserrat_20);
-    lv_obj_set_width(s_fetch_status, 28);
+    lv_label_set_text(s_fetch_status, LV_SYMBOL_OK);
+    style_label(s_fetch_status, lv_color_hex(0x50dc96), &lv_font_montserrat_14);
+    lv_obj_set_width(s_fetch_status, 24);
     lv_obj_set_style_text_align(s_fetch_status, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_fetch_status, 232, 210);
+    lv_obj_set_pos(s_fetch_status, 72, 213);
+
+    s_next_fetch_status = lv_label_create(screen);
+    lv_label_set_text(s_next_fetch_status, "NEXT --:--");
+    style_label(s_next_fetch_status, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_width(s_next_fetch_status, 96);
+    lv_obj_set_style_text_align(s_next_fetch_status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(s_next_fetch_status, 170, 216);
 }
 
 static void ui_show_message(const char *line1, const char *line2)
@@ -449,12 +526,13 @@ static void ui_update_status(const usage_status_t *status)
         return;
     }
     ui_build_status_screen();
-    lv_label_set_text(s_header_status, status->ok ? "LIVE" : status->message);
-    lv_obj_set_style_text_color(s_header_status, status->ok ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
     update_source_row(&s_claude_ui, &status->claude);
     update_source_row(&s_codex_ui, &status->codex);
     update_power_status(&status->power);
     update_fetch_status(false, status->ok);
+    if (s_next_fetch_status) {
+        set_label(s_next_fetch_status, "NEXT %02d:%02d", (STATUS_REFRESH_WAIT_MS / 1000) / 60, (STATUS_REFRESH_WAIT_MS / 1000) % 60);
+    }
     lvgl_port_unlock();
 }
 
@@ -630,15 +708,18 @@ static bool parse_source(cJSON *root, const char *name, source_status_t *out)
     if (!cJSON_IsObject(src)) {
         strlcpy(out->status, "missing", sizeof(out->status));
         out->current_pct = -1;
+        out->current_resets_in_sec = 0;
         out->weekly_pct = -1;
         return false;
     }
     cJSON *current = cJSON_GetObjectItem(src, "current_pct");
+    cJSON *current_reset = cJSON_GetObjectItem(src, "current_resets_in_sec");
     cJSON *weekly = cJSON_GetObjectItem(src, "weekly_pct");
     cJSON *stale = cJSON_GetObjectItem(src, "stale_sec");
     cJSON *status = cJSON_GetObjectItem(src, "status");
     cJSON *reset_gmt7 = cJSON_GetObjectItem(src, "current_resets_at_gmt7");
     out->current_pct = cJSON_IsNumber(current) ? current->valueint : -1;
+    out->current_resets_in_sec = cJSON_IsNumber(current_reset) ? current_reset->valueint : 0;
     out->weekly_pct = cJSON_IsNumber(weekly) ? weekly->valueint : -1;
     out->stale_sec = cJSON_IsNumber(stale) ? stale->valueint : -1;
     strlcpy(out->status, cJSON_IsString(status) ? status->valuestring : "error", sizeof(out->status));
@@ -797,6 +878,9 @@ void app_main(void)
         ui_update_status(&status);
 
         for (int elapsed_ms = 0; elapsed_ms < STATUS_REFRESH_WAIT_MS; elapsed_ms += BUTTON_POLL_MS) {
+            if (elapsed_ms % 1000 == 0) {
+                ui_update_next_fetch((STATUS_REFRESH_WAIT_MS - elapsed_ms) / 1000);
+            }
             if (button_fetch_requested()) {
                 break;
             }
