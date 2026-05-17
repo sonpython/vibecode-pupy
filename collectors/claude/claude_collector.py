@@ -5,10 +5,14 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+
+
+INTERVAL = int(os.environ.get("POLL_INTERVAL_SEC", "300"))
 
 
 def run_ccusage() -> dict[str, Any]:
@@ -128,12 +132,12 @@ def push(snapshot: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    try:
-        push(to_snapshot(run_ccusage()))
-    except Exception as exc:
-        sys.stderr.write(f"collect_failed: {exc}\n")
-        return 1
-    return 0
+    while True:
+        try:
+            push(to_snapshot(run_ccusage()))
+        except Exception as exc:
+            sys.stderr.write(f"collect_failed: {exc}\n")
+        time.sleep(INTERVAL)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,19 @@ services:
     depends_on:
       - usage-api
 
+  claude-collector:
+    build:
+      context: ../collectors/claude
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      USAGE_API_URL: http://usage-api:8080
+      POLL_INTERVAL_SEC: ${POLL_INTERVAL_SEC:-300}
+    volumes:
+      - ${HOME}/.claude:/root/.claude:ro
+    depends_on:
+      - usage-api
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]

@@ -7,6 +7,8 @@
 #include "cJSON.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "driver/usb_serial_jtag.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_check.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
@@ -44,6 +46,13 @@
 #define PIN_POWER_EN GPIO_NUM_NC
 #define HAS_POWER_EN 0
 #define PIN_BUTTON GPIO_NUM_5
+#define PIN_CHARGE_STATUS GPIO_NUM_48
+#define HAS_CHARGE_STATUS 1
+#define BATTERY_ADC_CHANNEL ADC_CHANNEL_6
+#define USB_ADC_CHANNEL ADC_CHANNEL_0
+#define BATTERY_ADC_SAMPLES 8
+#define USB_PRESENT_MIN_RAW 1500
+#define USB_PRESENT_MAX_RAW 4000
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
@@ -55,6 +64,7 @@ static int s_retry_num;
 static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_panel_io;
 static lv_display_t *s_lv_display;
+static adc_oneshot_unit_handle_t s_adc_handle;
 
 typedef struct {
     lv_obj_t *current_pct;
@@ -67,6 +77,7 @@ typedef struct {
 static source_widgets_t s_claude_ui;
 static source_widgets_t s_codex_ui;
 static lv_obj_t *s_header_status;
+static lv_obj_t *s_power_status;
 
 typedef struct {
     int current_pct;
@@ -76,8 +87,18 @@ typedef struct {
 } source_status_t;
 
 typedef struct {
+    int battery_pct;
+    int battery_raw;
+    int usb_raw;
+    int charge_gpio;
+    bool charging;
+    bool has_battery;
+} power_status_t;
+
+typedef struct {
     source_status_t claude;
     source_status_t codex;
+    power_status_t power;
     bool ok;
     char message[64];
 } usage_status_t;
@@ -193,6 +214,103 @@ static void update_source_row(source_widgets_t *widgets, const source_status_t *
     lv_obj_set_style_text_color(widgets->status, strcmp(source->status, "ok") == 0 ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
 }
 
+static int battery_pct_from_adc(int raw)
+{
+    const struct {
+        int raw;
+        int pct;
+    } levels[] = {
+        {1970, 0},
+        {2062, 20},
+        {2154, 40},
+        {2246, 60},
+        {2338, 80},
+        {2430, 100},
+    };
+
+    if (raw <= levels[0].raw) {
+        return 0;
+    }
+    if (raw >= levels[5].raw) {
+        return 100;
+    }
+    for (int i = 0; i < 5; i++) {
+        if (raw >= levels[i].raw && raw < levels[i + 1].raw) {
+            int span_raw = levels[i + 1].raw - levels[i].raw;
+            int span_pct = levels[i + 1].pct - levels[i].pct;
+            return levels[i].pct + ((raw - levels[i].raw) * span_pct) / span_raw;
+        }
+    }
+    return 0;
+}
+
+static power_status_t read_power_status(void)
+{
+    power_status_t power = {
+        .battery_pct = -1,
+        .battery_raw = -1,
+        .usb_raw = -1,
+        .charge_gpio = -1,
+        .charging = false,
+        .has_battery = false,
+    };
+
+    if (s_adc_handle) {
+        int total = 0;
+        int samples = 0;
+        for (int i = 0; i < BATTERY_ADC_SAMPLES; i++) {
+            int raw = 0;
+            if (adc_oneshot_read(s_adc_handle, BATTERY_ADC_CHANNEL, &raw) == ESP_OK) {
+                total += raw;
+                samples++;
+            }
+        }
+        if (samples > 0) {
+            power.battery_raw = total / samples;
+            power.battery_pct = battery_pct_from_adc(power.battery_raw);
+            power.has_battery = true;
+        }
+    }
+
+    int usb_raw = 0;
+    if (s_adc_handle && adc_oneshot_read(s_adc_handle, USB_ADC_CHANNEL, &usb_raw) == ESP_OK) {
+        power.usb_raw = usb_raw;
+        power.charging = usb_raw > USB_PRESENT_MIN_RAW && usb_raw < USB_PRESENT_MAX_RAW;
+    }
+#if HAS_CHARGE_STATUS
+    power.charge_gpio = gpio_get_level(PIN_CHARGE_STATUS);
+    power.charging = power.charging || power.charge_gpio == 1;
+#endif
+    power.charging = power.charging || usb_serial_jtag_is_connected();
+
+    ESP_LOGI(
+        TAG,
+        "power battery_raw=%d battery_pct=%d usb_raw=%d charge_gpio=%d charging=%d",
+        power.battery_raw,
+        power.battery_pct,
+        power.usb_raw,
+        power.charge_gpio,
+        power.charging);
+    return power;
+}
+
+static void update_power_status(const power_status_t *power)
+{
+    if (!s_power_status) {
+        return;
+    }
+    if (!power->has_battery) {
+        lv_label_set_text(s_power_status, "BAT --");
+        lv_obj_set_style_text_color(s_power_status, lv_color_hex(0x909aaa), 0);
+        return;
+    }
+    set_label(s_power_status, "%s %d%%", power->charging ? "CHG" : "BAT", power->battery_pct);
+    lv_obj_set_style_text_color(
+        s_power_status,
+        power->charging ? lv_color_hex(0x55d2ff) : pct_color(100 - power->battery_pct),
+        0);
+}
+
 static void ui_build_status_screen(void)
 {
     lv_obj_t *screen = lv_screen_active();
@@ -218,6 +336,13 @@ static void ui_build_status_screen(void)
     lv_label_set_text(refresh, "BTN REFRESH");
     style_label(refresh, lv_color_hex(0x788291), &lv_font_montserrat_12);
     lv_obj_set_pos(refresh, 14, 216);
+
+    s_power_status = lv_label_create(screen);
+    lv_label_set_text(s_power_status, "BAT --");
+    style_label(s_power_status, lv_color_hex(0x909aaa), &lv_font_montserrat_12);
+    lv_obj_set_width(s_power_status, 90);
+    lv_obj_set_style_text_align(s_power_status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(s_power_status, 134, 216);
 
     lv_obj_t *spinner = lv_spinner_create(screen);
     lv_obj_set_size(spinner, 22, 22);
@@ -262,6 +387,7 @@ static void ui_update_status(const usage_status_t *status)
     lv_obj_set_style_text_color(s_header_status, status->ok ? lv_color_hex(0x50dc96) : lv_color_hex(0xeb505a), 0);
     update_source_row(&s_claude_ui, &status->claude);
     update_source_row(&s_codex_ui, &status->codex);
+    update_power_status(&status->power);
     lvgl_port_unlock();
 }
 
@@ -513,6 +639,32 @@ static void configure_button(void)
     ESP_ERROR_CHECK(gpio_config(&cfg));
 }
 
+static void init_power_monitor(void)
+{
+#if HAS_CHARGE_STATUS
+    gpio_config_t charge_cfg = {
+        .pin_bit_mask = 1ULL << PIN_CHARGE_STATUS,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&charge_cfg));
+#endif
+
+    adc_oneshot_unit_init_cfg_t unit_cfg = {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &s_adc_handle));
+
+    adc_oneshot_chan_cfg_t chan_cfg = {
+        .atten = ADC_ATTEN_DB_12,
+        .bitwidth = ADC_BITWIDTH_12,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, BATTERY_ADC_CHANNEL, &chan_cfg));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, USB_ADC_CHANNEL, &chan_cfg));
+}
+
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -523,6 +675,7 @@ void app_main(void)
 
     init_display();
     configure_button();
+    init_power_monitor();
     ui_show_message("WIFI", WIFI_SSID);
 
     if (!wifi_connect()) {
@@ -538,6 +691,7 @@ void app_main(void)
         if (!got) {
             status.ok = false;
         }
+        status.power = read_power_status();
         ui_update_status(&status);
 
         for (int i = 0; i < 240; i++) {

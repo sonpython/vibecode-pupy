@@ -86,6 +86,35 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 14:16 SGT — battery-charge-and-claude-collector
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked to show battery percent/charging status on the robot screen and fix missing Claude Code usage.
+
+### ✅ Done
+- Added a Dockerized `claude-collector` service that runs `ccusage` continuously with Node 22 and posts snapshots to `usage-api`.
+- Rebuilt and restarted the live compose stack; verified `claude.status = ok`, `codex.status = ok`, and both collectors post to `/collect/*`.
+- Added ESP32 power footer showing `BAT xx%` or `CHG xx%`.
+- Added battery ADC reading from `ADC_CHANNEL_6` / GPIO7, using the same raw threshold family found in the factory firmware lineage.
+- Added charging detection fallbacks from USB ADC, charge GPIO, and USB-Serial/JTAG host connection.
+- Rebuilt and flashed firmware; verified serial boot, Wi-Fi, HTTPS status fetch, and power log with `charging=1` while connected over USB.
+
+### 📁 Files changed
+- `collectors/claude/Dockerfile` — NEW, Node 22 + Python runtime for ccusage collector.
+- `collectors/claude/claude_collector.py` — UPDATED, run continuously instead of one-shot.
+- `usage-api/docker-compose.yml` — UPDATED, added `claude-collector` service.
+- `firmware/usage-monitor/main/main.c` — UPDATED, battery/charging state readout and LVGL footer.
+- `firmware/usage-monitor/main/CMakeLists.txt` — UPDATED, ADC and USB-Serial/JTAG component deps.
+- `docs/codex-memory.md` — UPDATED, prepended this handoff entry.
+
+### 🔑 Key decisions
+- Run Claude usage collection in Docker rather than launchd so the live stack owns both Codex and Claude collectors.
+- Use USB-Serial/JTAG connection as a pragmatic charging indicator for the current cabled device because the tested board pins did not expose USB-in during monitor tests.
+
+### ⚠ Blockers / open questions
+- Battery ADC currently logs very low raw values around 370-400, so display shows 0%. This likely means the LiPo cell is not connected or the board revision gates battery voltage differently.
+
 ## 2026-05-17 13:32 SGT — wonderboy-display-gpio-map-from-factory
 
 **Actor**: codex-cli
