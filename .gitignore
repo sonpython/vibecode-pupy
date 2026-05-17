@@ -49,6 +49,8 @@ secrets/
 firmware/secrets/
 firmware/usage-monitor/main/secrets.h
 firmware/usage-monitor/build/
+firmware/usage-monitor/managed_components/
+firmware/usage-monitor/dependencies.lock
 firmware/usage-monitor/sdkconfig
 firmware/usage-monitor/sdkconfig.old
 usage-api/data/

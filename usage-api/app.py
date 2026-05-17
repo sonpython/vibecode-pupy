@@ -8,15 +8,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from schemas import CollectIn, Source, SourceStatus, StatusOut
 
 
 DB_PATH = Path(os.environ.get("USAGE_DB_PATH", "/data/usage.db"))
+APP_DIR = Path(__file__).resolve().parent
+STATIC_DIR = APP_DIR / "static"
 STALE_AFTER_SEC = int(os.environ.get("STALE_AFTER_SEC", "600"))
 SOURCES: tuple[Source, Source] = ("claude", "codex")
 
 app = FastAPI(title="Usage Monitor API", version="0.1.0")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 def db() -> sqlite3.Connection:
@@ -105,8 +110,7 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/status", response_model=StatusOut, dependencies=[Depends(verify_device_secret)])
-def get_status() -> StatusOut:
+def build_status() -> StatusOut:
     rows = {
         row["source"]: row
         for row in conn.execute("SELECT source, ts, payload, status FROM snapshots").fetchall()
@@ -133,3 +137,18 @@ def get_status() -> StatusOut:
         )
 
     return StatusOut(ts=datetime.now(timezone.utc).isoformat(), **result)
+
+
+@app.get("/", include_in_schema=False)
+def root() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/public/status", response_model=StatusOut)
+def public_status() -> StatusOut:
+    return build_status()
+
+
+@app.get("/status", response_model=StatusOut, dependencies=[Depends(verify_device_secret)])
+def get_status() -> StatusOut:
+    return build_status()

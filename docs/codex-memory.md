@@ -86,6 +86,63 @@ Field `Actor` PHẢI chọn 1 trong:
 
 <!-- ENTRY MARKER — agents prepend here -->
 
+## 2026-05-17 13:03 SGT — usage-api-web-live-deploy
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: Continue after root monitor UI patch; user wanted `https://vibecode.sonpython.com/` to show a robot-like screen.
+
+### ✅ Done
+- Rebuilt and restarted the live `usage-api` Docker service behind the existing Cloudflare tunnel.
+- Verified `https://vibecode.sonpython.com/` serves the monitor HTML and `https://vibecode.sonpython.com/public/status` returns live Claude/Codex JSON.
+- Fixed mobile horizontal overflow found via headless Chrome screenshots by tightening hero typography and stacking source badges on mobile.
+- Added cache-busting query versions to static asset links so Cloudflare/browser caches pick up the updated CSS/JS.
+- Re-tested API with `pytest -q usage-api/tests` after deploy.
+
+### 📁 Files changed
+- `usage-api/static/index.html` — UPDATED, versioned CSS/JS asset URLs
+- `usage-api/static/styles.css` — UPDATED, mobile overflow fix
+- `docs/codex-memory.md` — UPDATED, prepended this live deploy note
+
+### 🔑 Key decisions
+- Leave authenticated `/status` unchanged for ESP32 clients; expose browser data through `/public/status` only.
+
+### 📊 State changes (active projects)
+- Public domain root: API-only/blank -> live robot-style usage dashboard.
+
+## 2026-05-17 12:57 SGT — usage-api-root-monitor-ui
+
+**Actor**: codex-cli
+**Branch**: main
+**Trigger**: User asked for a robot usage monitor web screen at `https://vibecode.sonpython.com/`
+
+### ✅ Done
+- Added a root web UI for `usage-api` that resembles the ESP32 usage monitor: robot face, Claude/Codex current + weekly usage bars, source status badges, stale age, and live/error state.
+- Added `/public/status` as a read-only UI status endpoint so browser code can poll aggregate usage data without exposing `DEVICE_SECRET`.
+- Kept existing authenticated `/status` endpoint intact for ESP32/device clients.
+- Updated Dockerfile to include static assets in the runtime image.
+- Added tests for root UI serving and public status access.
+- Verified with `pytest -q usage-api/tests`, `python3 -m py_compile usage-api/app.py usage-api/schemas.py`, Docker image build, and local Docker HTTP checks on `127.0.0.1:18080`.
+
+### 📁 Files changed
+- `usage-api/app.py` — UPDATED, static mount, root route, shared status builder, public UI status endpoint
+- `usage-api/Dockerfile` — UPDATED, copy static assets
+- `usage-api/tests/test_app.py` — UPDATED, root/public status tests
+- `usage-api/static/index.html` — NEW, monitor UI markup
+- `usage-api/static/styles.css` — NEW, responsive robot/dashboard styling
+- `usage-api/static/app.js` — NEW, polling/rendering logic
+- `docs/codex-memory.md` — UPDATED, prepended this entry
+
+### 🔑 Key decisions
+- Use a server-side public status proxy instead of injecting `DEVICE_SECRET` into browser JavaScript.
+- Keep this scoped to `usage-api` frontend/static assets and route serving; firmware was not touched.
+
+### 📊 State changes (active projects)
+- Usage API web root: health/API only -> responsive usage monitor screen.
+
+### 🚨 Follow-ups
+- [ ] Parent can rebuild/redeploy the live `usage-api` service behind Cloudflare when ready.
+
 ## 2026-05-17 12:45 SGT — esp32-usage-monitor-firmware-live
 
 **Actor**: codex-cli

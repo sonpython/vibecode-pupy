@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Usage Monitor</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260517-1302" />
+    <script src="/static/app.js?v=20260517-1302" defer></script>
+  </head>
+  <body>
+    <main class="shell" aria-live="polite">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">ESP32 usage monitor</p>
+          <h1>Claude + Codex</h1>
+        </div>
+        <div class="live-pill" id="live-state">
+          <span class="dot"></span>
+          <span>Connecting</span>
+        </div>
+      </section>
+
+      <section class="robot-panel" aria-label="Usage status">
+        <div class="robot-face" id="robot-face">
+          <div class="antenna"></div>
+          <div class="eyes">
+            <span></span>
+            <span></span>
+          </div>
+          <div class="mouth"></div>
+        </div>
+
+        <div class="readouts">
+          <article class="source" data-source="claude">
+            <div class="source-head">
+              <div>
+                <h2>Claude</h2>
+                <p id="claude-meta">Waiting for snapshot</p>
+              </div>
+              <span class="badge" id="claude-status">missing</span>
+            </div>
+            <div class="meter">
+              <div class="meter-label">
+                <span>Current block</span>
+                <strong id="claude-current-text">--%</strong>
+              </div>
+              <div class="track"><span id="claude-current-bar"></span></div>
+            </div>
+            <div class="meter">
+              <div class="meter-label">
+                <span>Weekly</span>
+                <strong id="claude-weekly-text">--%</strong>
+              </div>
+              <div class="track"><span id="claude-weekly-bar"></span></div>
+            </div>
+          </article>
+
+          <article class="source" data-source="codex">
+            <div class="source-head">
+              <div>
+                <h2>Codex</h2>
+                <p id="codex-meta">Waiting for snapshot</p>
+              </div>
+              <span class="badge" id="codex-status">missing</span>
+            </div>
+            <div class="meter">
+              <div class="meter-label">
+                <span>Current block</span>
+                <strong id="codex-current-text">--%</strong>
+              </div>
+              <div class="track"><span id="codex-current-bar"></span></div>
+            </div>
+            <div class="meter">
+              <div class="meter-label">
+                <span>Weekly</span>
+                <strong id="codex-weekly-text">--%</strong>
+              </div>
+              <div class="track"><span id="codex-weekly-bar"></span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="footer-strip" aria-label="Monitor telemetry">
+        <div>
+          <span>API</span>
+          <strong id="api-state">checking</strong>
+        </div>
+        <div>
+          <span>Last refresh</span>
+          <strong id="last-refresh">--</strong>
+        </div>
+        <div>
+          <span>Next poll</span>
+          <strong>15s</strong>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -26,12 +26,12 @@
 #define LCD_HOST SPI3_HOST
 #define LCD_WIDTH 240
 #define LCD_HEIGHT 240
-#define PIN_LCD_SCLK GPIO_NUM_4
-#define PIN_LCD_MOSI GPIO_NUM_2
-#define PIN_LCD_CS GPIO_NUM_5
-#define PIN_LCD_DC GPIO_NUM_47
-#define PIN_LCD_RST GPIO_NUM_38
-#define PIN_BACKLIGHT GPIO_NUM_42
+#define PIN_LCD_SCLK GPIO_NUM_12
+#define PIN_LCD_MOSI GPIO_NUM_10
+#define PIN_LCD_CS GPIO_NUM_13
+#define PIN_LCD_DC GPIO_NUM_14
+#define PIN_LCD_RST GPIO_NUM_11
+#define PIN_BACKLIGHT GPIO_NUM_16
 #define PIN_BUTTON GPIO_NUM_0
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -42,6 +42,7 @@ static const char *TAG = "vibecode";
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num;
 static esp_lcd_panel_handle_t s_panel;
+static esp_lcd_panel_io_handle_t s_panel_io;
 
 typedef struct {
     int current_pct;
@@ -221,19 +222,18 @@ static void init_display(void)
         .mode = GPIO_MODE_OUTPUT,
     };
     ESP_ERROR_CHECK(gpio_config(&bk_cfg));
-    gpio_set_level(PIN_BACKLIGHT, 0);
+    gpio_set_level(PIN_BACKLIGHT, 1);
 
     spi_bus_config_t buscfg = {
+        .sclk_io_num = PIN_LCD_SCLK,
         .mosi_io_num = PIN_LCD_MOSI,
         .miso_io_num = GPIO_NUM_NC,
-        .sclk_io_num = PIN_LCD_SCLK,
         .quadwp_io_num = GPIO_NUM_NC,
         .quadhd_io_num = GPIO_NUM_NC,
-        .max_transfer_sz = LCD_WIDTH * 40 * sizeof(uint16_t),
+        .max_transfer_sz = LCD_WIDTH * LCD_HEIGHT * sizeof(uint16_t),
     };
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
 
-    esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_spi_config_t io_config = {
         .dc_gpio_num = PIN_LCD_DC,
         .cs_gpio_num = PIN_LCD_CS,
@@ -243,21 +243,28 @@ static void init_display(void)
         .spi_mode = 0,
         .trans_queue_depth = 10,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &s_panel_io));
 
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = PIN_LCD_RST,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io_handle, &panel_config, &s_panel));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(s_panel_io, &panel_config, &s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, false, false));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, false));
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, true));
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, true, false));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, false));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
+    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(220, 40, 60));
+    vTaskDelay(pdMS_TO_TICKS(350));
+    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(35, 190, 120));
+    vTaskDelay(pdMS_TO_TICKS(350));
+    lcd_draw_rect(0, 0, LCD_WIDTH, LCD_HEIGHT, rgb565(35, 110, 230));
+    vTaskDelay(pdMS_TO_TICKS(350));
     draw_message("BOOTING", "display ok");
+    ESP_LOGI(TAG, "display initialized and diagnostic colors drawn");
 }
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)

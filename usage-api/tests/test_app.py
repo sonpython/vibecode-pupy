@@ -58,6 +58,30 @@ def test_auth_failures(monkeypatch, tmp_path):
     assert client.get("/status").status_code == 401
 
 
+def test_root_serves_usage_monitor_ui(monkeypatch, tmp_path):
+    client = make_client(monkeypatch, tmp_path)
+
+    res = client.get("/")
+
+    assert res.status_code == 200
+    assert "Claude + Codex" in res.text
+    assert "/static/app.js" in res.text
+
+
+def test_public_status_does_not_require_device_secret(monkeypatch, tmp_path):
+    client = make_client(monkeypatch, tmp_path)
+    client.post(
+        "/collect/codex",
+        headers={"Authorization": "Bearer codex-token"},
+        json=snapshot(42),
+    )
+
+    res = client.get("/public/status")
+
+    assert res.status_code == 200
+    assert res.json()["codex"]["current_pct"] == 42
+
+
 def test_stale_snapshot(monkeypatch, tmp_path):
     client = make_client(monkeypatch, tmp_path)
     client.post(
